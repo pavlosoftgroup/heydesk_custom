@@ -1,0 +1,239 @@
+<?php
+
+/**
+ * Implements hook_init
+ */
+function heydesk_favorite_init() {
+
+  drupal_add_js(drupal_get_path('module', 'heydesk_favorite') . '/js/heydesk_favorite.js');
+
+
+}
+
+/**
+ * Implements hook_entity_info
+ */
+function heydesk_favorite_entity_info() {
+  return array(
+    'heydesk_favorite' => array(
+      'label' => t('Favorite item'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'views controller class' => 'EntityDefaultViewsController',
+      'base table' => 'heydesk_favorite',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      //    'admin ui' => array(
+      //      'path' => 'admin/config/heydesk/messenger'
+      //    ),
+      'access callback' => 'heydesk_favorite_access',
+      'module' => 'heydesk_favorite',
+    ),
+  );
+}
+
+/**
+ * Implements hook_access
+ */
+function heydesk_favorite_access($op, $entity, $account = NULL, $entity_type = 'heydesk_favorite') {
+  return user_access('heydesk user');
+}
+
+/**
+ * Function realised load custom entity
+ * @param $id entity id
+ * @return entity object
+ */
+function heydesk_favorite_load($id) {
+  $result = entity_load('heydesk_favorite', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+/**
+ * Function realised ajax callback
+ * @param null $js
+ * @param $pid proposal id
+ * @param $uid user id
+ * @return ajax commands
+ */
+function heydesk_favorite_remove_callback($js = NULL, $pid, $uid) {
+
+  db_delete('heydesk_favorite')
+    ->condition('uid', $uid)
+    ->condition('pid', $pid)
+    ->execute();
+
+  $remove_id = '#favorite-node-' . $pid;
+  $result = array(
+    '#type' => 'ajax',
+    '#commands' => array(
+      ajax_command_remove($remove_id),
+    )
+  );
+  return $result;
+}
+
+function heydesk_ajax_remove_deliver($page_callback_result) {
+
+
+}
+
+/**
+ * Function realised list user favorites proposal
+ * @param $user user enity
+ * @return string
+ */
+
+function heydesk_favorite_item_list($user) {
+  $item_list = db_select('heydesk_favorite', 'hf')
+    ->fields('hf', array('pid'))
+    ->condition('hf.uid', $user->uid)
+    ->orderBy('hf.date', 'DESC')
+    ->execute()
+    ->fetchCol();
+
+  $favorites_items = node_load_multiple($item_list);
+
+  drupal_add_library('system', 'drupal.ajax');
+
+
+  $output = '<h1>' . t('Favourites') . '</h1>';
+  $output .= '<div class="item" id="content-favorite">';
+
+
+  foreach ($favorites_items as $node) {
+    if ($node->status == 1) {
+      $options = array(
+        'label' => 'hidden',
+        // 'inline', 'above' and 'hidden', defaults to 'above'
+        'type' => 'full',
+      );
+
+      $options_term = array(
+        'label' => 'hidden',
+        'type' => 'taxonomy_term_reference_link',
+      );
+      $options_img = array(
+        'type' => 'image',
+        'label' => 'hidden',
+        'settings' => array(
+          'image_style' => 'proposal_355x312',
+          'image_link' => 'content', // content, file
+        )
+      );
+
+      $output .= '<div class="favorite-node-item">';
+      $output .= '<div id="favorite-node-' . $node->nid . '" class="info col-lg-3 col-md-4 col-sm-5  info--important">';
+      $output .= '<div class="info-text">';
+      $output .= '<div class="info-title">';
+      $output .= $node->title;
+      $output .= '</div>';
+      $output .= '<i class="fa fa-map-marker" aria-hidden="true"></i>';
+      $city = field_view_field('node', $node, 'field_sities', $options_term);
+      $output .= render($city);
+      $output .= '</div>';
+      $output .= '<div class="photos">';
+      $img = field_get_items('node', $node, 'field_photos');
+      $img = isset($img[1]) ? field_view_value('node', $node, 'field_photos', $img[0], $options_img) : field_view_field('node', $node, 'field_photos', $options_img);
+      $output .= render($img);
+      $output .= '<div class="hat">';
+      $new = field_view_field('node', $node, 'field_new', $options);
+      $pop = field_view_field('node', $node, 'field_popular', $options);
+      $barg = field_view_field('node', $node, 'field_bargain', $options);
+      $output .= _empty_string_field($new) ? '<div class="new">' . render($new) . '</div>' : '';
+      $output .= _empty_string_field($pop) ? '<div class="popular">' . render($pop) . '</div>' : '';
+      $output .= _empty_string_field($barg) ? '<div class="activity">' . render($barg) . '</div>' : '';
+      $output .= '</div>';
+      $output .= '<div class="price">' . t('From');
+      $output .= '$ ';
+      $price = field_view_field('node', $node, 'field_price', $options);
+      $output .= render($price);
+      $output .= '/';
+      $renyal_oer = field_view_field('node', $node, 'field_minimum_rental_period', $options);
+      $output .= render($renyal_oer);
+      $output .= '</div>';
+      $output .= '</div>';
+      $output .= '<div class="multiple-proposal-map" style="width:100%; height: 100%;"></div>';
+      $output .= '<div class="operations">';
+      $url_remove = 'user/nojs/favorite/' . $node->nid . '/' . $user->uid;
+      $output .= l(t('Delete'), $url_remove, array(
+        'attributes' => array(
+          'id' => 'buttom-num-' . $node->nid,
+          'class' => array(
+            'use-ajax',
+            'remove-favorite'
+          ),
+        )
+      ));
+      $output .= l(t('Book Now'), 'node/' . $node->nid, array(
+        'attributes' => array(
+          'class' => array(
+            'button',
+            'book_now_button',
+          )
+        )
+      ));
+      $output .= '</div>';
+      $output .= '</div>';
+      $output .= '</div>';
+    }
+  }
+  $output .= '</div>';
+  return $output;
+}
+
+/**
+ * @param $array
+ * @return bool
+ */
+function _empty_string_field($array) {
+
+  $result = strlen($array[0]['#markup']) <= 0 ? FALSE : TRUE;
+  return $result;
+}
+
+/**
+ * @param $prop_id proporal id
+ * @param $operations operation type
+ * @param null $js
+ * @return ajax commands
+ */
+
+function heydesk_favorite_page_callback($prop_id, $operations, $js = NULL) {
+  global $user;
+
+  drupal_add_library('system', 'drupal.ajax');
+  if ($operations == 'add') {
+    $link = l(t('Remove from Favorites'), 'proposal/' . $prop_id . '/favorite/remove/nojs', array(
+        'attributes' => array(
+          'class' => array('use-ajax'),
+        )
+      )) . ' <span class="remove_favorite"></span>';
+
+    db_insert('heydesk_favorite')->fields(array(
+      'pid' => $prop_id,
+      'uid' => $user->uid,
+      'date' => (string) date('U'),
+    ))->execute();
+  }
+  else {
+    $link = l(t('Add to Favorites'), 'proposal/' . $prop_id . '/favorite/add/nojs', array(
+        'attributes' => array(
+          'class' => array('use-ajax'),
+        )
+      )) . ' <span class="add_favorite"></span>';
+    db_delete('heydesk_favorite')
+      ->condition('uid', $user->uid)
+      ->condition('pid', $prop_id)
+      ->execute();
+  }
+  return array(
+    '#type' => 'ajax',
+    '#commands' => array(
+      ajax_command_html('#favorite', $link),
+    ),
+  );
+}
+

@@ -1,0 +1,6 @@
+name = Heydesk External API
+description = Realisation include External API
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_external_api.module
+;files[] = heydesk_external_api.install

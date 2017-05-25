@@ -1,0 +1,9 @@
+name = Heydesk Rating
+description = Realisation rating proposal system in site
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_stars_rating.module
+files[] = heydesk_stars_rating.install
+
+;dependencies[] = heydesk_stars_rating
+dependencies[] = entity

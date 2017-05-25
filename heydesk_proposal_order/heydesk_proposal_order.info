@@ -1,0 +1,6 @@
+name = Heydesk Proposal Order
+description = Realisation proposal order form.
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_proposal_order.module
+;files[] = heydesk_proposal_order.install

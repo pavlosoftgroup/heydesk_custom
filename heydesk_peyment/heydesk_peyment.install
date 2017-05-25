@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_peyment_schema()
+{
+  $schema['heydesk_peyment_remittance'] = array(
+    'description' => t('Table for payment remittance'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'payer_uid'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('Payer User Id ')),
+      'payee_ius'        => array('type' => 'int', 'length' => 8,  'description' => t('Payee User Id')),
+      'remittance'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('Amount remittance')),
+      'status' => array('type' => 'int', 'length' => 2, 'not null' => TRUE, 'description' => t('Status remittance')),
+      'date' => array('type' => 'int', 'length' => 24, 'not null' => TRUE, 'description' => t('Remittance date')),
+      'data' => array('type' => 'varchar', 'length' => 225, 'default' => '1', 'description' => t('Message Data')),
+      'balance_payer' => array('type' => 'varchar', 'length' => 225, 'default' => '1', 'description' => t('Message Data')),
+      'payment' => array('type' => 'varchar', 'length' => 225, 'default' => '1', 'description' => t('Pa yment Data')),
+      'description' => array('type' => 'varchar', 'length' => 225, 'default' => '1', 'description' => t('Description Data')),
+    ),
+    'indexes' => array(
+      'remittance' => array('remittance')
+    ),
+    'primary key' => array('id')
+  );
+  $schema['heydesk_peyment_account'] = array(
+    'description' => t('Table for payment acount'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'owner_id'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('Payer User Id ')),
+      'expanse'       => array('type' => 'int', 'length' => 16, 'description' => t('Amount expanse')),
+      'status' => array('type' => 'int', 'length' => 2, 'not null' => TRUE, 'description' => t('Status expanse')),
+      'status_key' => array('type' => 'varchar', 'length' => 225, 'default' => '1', 'description' => t('Message expanse')),
+    ),
+    'indexes' => array(
+      'owner_id' => array('owner_id')
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

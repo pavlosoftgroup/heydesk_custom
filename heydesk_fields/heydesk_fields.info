@@ -1,0 +1,6 @@
+name = Heydesk Fields
+description = Realisation specialisation fields
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_fields.module
+;files[] = heydesk_fields.install

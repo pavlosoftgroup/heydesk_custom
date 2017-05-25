@@ -1,0 +1,9 @@
+name = Heydesk Proposal Right Column
+description = Realisation block in right column from Proposal Page
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_right_prop.module
+
+dependencies[] = heydesk_right_prop
+dependencies[] = heydesk_custom_function
+dependencies[] = heydesk_calendar

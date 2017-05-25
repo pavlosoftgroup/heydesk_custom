@@ -1,0 +1,859 @@
+<?php
+drupal_load('module', 'heydesk_custom_function');
+//include(drupal_get_path('heydesk_custom_function'));
+module_load_include('inc', 'hyedesk_messenger', 'includes/hyedesk-messenger.block');
+
+drupal_add_css(drupal_get_path('module', 'hyedesk_messenger') . '/css/heydeak-messenger.css');
+
+function hyedesk_messenger_init() {
+
+
+  // drupal_add_js(drupal_get_path('module', 'heydesk_user') . '/js/libked-in.j)');
+
+
+}
+
+/**
+ * Implement hook_menu()
+ */
+
+function hyedesk_messenger_menu() {
+
+  $items['user/%user/messages'] = array(
+    'title' => t('Inbox'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'hyedesk_messenger_list',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'menu_name' => 'menu-profile',
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['user/%user/messages-send/%/%ctools_js/%'] = array(
+    'title' => t('Send messges'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'hyedesk_messenger_send_form_callback',
+    'page arguments' => array(1, 3, 4, 5),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['message/inactive/%'] = array(
+    'title' => t('Inactivemessges'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'hyedesk_messenger_inactive_callback',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['user/%user/messages/%'] = array(
+    'title' => t('Messages'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'hyedesk_messenger_user_list',
+    'page arguments' => array(1, 3),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+
+//register
+function hyedesk_messenger_entity_info() {
+  return array(
+    'hyedesk_messenger' => array(
+      'label' => t('Message'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'hyedesk_messenger',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id',
+        'label' => 'label'
+      ),
+      'admin ui' => array(
+        'path' => 'admin / config / heydesk / messenger'
+      ),
+      'access callback' => 'hyedesk_messenger_access',
+      'module' => 'hyedesk_messenger',
+    ),
+  );
+}
+
+
+function hyedesk_messenger_access($op, $entity, $account = NULL, $entity_type = 'hyedesk_messenger') {
+  return user_access('heydesk user');
+}
+
+function hyedesk_messenger_load($id) {
+  $result = entity_load('hyedesk_messenger', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+function hyedesk_messenger_inactive_callback($sendler_id) {
+  global $user;
+  if ($sendler_id == 'all') {
+    $entities = db_select('hyedesk_messenger', 'hm')
+      ->fields('hm', array('id'))
+      ->condition(db_or()//        ->condition('uid', $sendler_id)
+      ->condition('sid', $user->uid)
+        ->condition('status', 1))//      ->orderBy('hm.date ', 'DESC')
+      ->execute()
+      ->fetchCol();
+    if ($entities[0]) {
+      foreach ($entities as $value) {
+        $entity = hyedesk_messenger_load($value);
+        $entity->status = 0;
+        $entity = entity_save('hyedesk_messenger', $entity);
+      }
+      ctools_include('ajax');
+      $commands[] = ajax_command_invoke('tr.red-background', 'removeClass', array('red-background'));
+
+      //      $commands[] = ctools_ajax_command_attr('tr.red-background', 'addClass', 'odd');
+      return array('#type' => 'ajax', '#commands' => $commands);
+
+    }
+
+
+  }
+  else {
+    $entities = db_select('hyedesk_messenger', 'hm')
+      ->fields('hm', array('id'))
+      ->condition(db_or()
+        ->condition('uid', $sendler_id)
+        ->condition('sid', $user->uid)
+        ->condition('status', 1))//      ->orderBy('hm.date ', 'DESC')
+      ->execute()
+      ->fetchCol();
+
+    if ($entities[0]) {
+      foreach ($entities as $value) {
+        $entity = hyedesk_messenger_load($value);
+        $entity->status = 0;
+        $entity = entity_save('hyedesk_messenger', $entity);
+      }
+      ctools_include('ajax');
+      $commands[] = ajax_command_invoke('.row-' . $sendler_id, 'removeClass', array('red-background'));
+
+      //      $commands[] = ctools_ajax_command_attr('.row-' . $sendler_id, 'class', 'odd');
+      return array('#type' => 'ajax', '#commands' => $commands);
+
+    }
+
+  }
+}
+
+function _message_user_view($people, $date = NULL, $type = 'small') {
+  global $user;
+  $class_my = $people->uid == $user->uid ? 'user' : 'sendler';
+  $options_img_big = array(
+    'type' => 'image',
+    'label' => 'hidden',
+    'settings' => array(
+      'image_style' => 'user_150x150',
+      'image_link' => 'none', // content, file
+    )
+  );
+  $options_img_small = array(
+    'type' => 'image',
+    'label' => 'hidden',
+    'settings' => array(
+      'image_style' => 'user_40x40',
+      'image_link' => 'none', // content, file
+    )
+  );
+  $options_img = $type == 'big' ? $options_img_big : $options_img_small;
+  $time = $type == 'big' ? '' : date('H:i', $date);
+  $photo = field_view_field('user', $people, 'field_user_avatar', $options_img);
+  //  $photo = field_view_value('user', $user, 'field_user_avatar', $photo[0]);
+  // $fname_field = field_view_field('user', $sendler, 'field_first_name');
+  //  $name_field = field_view_field('user', $sendler, 'field_surname');
+  $name = field_get_items('user', $people, 'field_surname');
+  $name = field_view_value('user', $people, 'field_surname', $name[0], array(
+    'label' => 'hidden',
+  ));
+  $fname = field_get_items('user', $people, 'field_first_name');
+  $fname = field_view_value('user', $people, 'field_first_name', $fname[0], array(
+    'label' => 'hidden',
+  ));
+
+  $sendler_data = '<div class="' . $class_my . '">';
+  $sendler_data .= '<div class="avatar">';
+  $sendler_data .= drupal_render($photo);
+  $sendler_data .= '</div>';
+  $sendler_data .= $type == 'big' ? '<h3 class="messages-user-name">' : '<b class="messages-user-name">';
+  $sendler_data .= '';
+  $sendler_data .= drupal_render($name);
+  $sendler_data .= '  ';
+
+  $sendler_data .= drupal_render($fname);
+  $sendler_data .= $type == 'big' ? '</h3>' : '</b>';
+  $sendler_data .= '<p>';
+  $sendler_data .= $time;
+  $sendler_data .= '</p>';
+  $sendler_data .= '</div>';
+
+  return $sendler_data;
+}
+
+function hyedesk_messenger_user_list($user_to, $sendler) {
+  global $user;
+
+
+  //    dpm($user_to);
+  $uid = $user_to->uid;
+  $sendler = user_load($sendler);
+  $user = user_load($uid);
+  //    dpm($sendler);
+
+  //   drupal_goto('user/'.$user.'/messages-send/'.$sendler.'/nojs');
+
+
+  $massages_for = db_select('hyedesk_messenger', 'hm')
+    ->fields('hm', array(
+      'id',
+      'uid',
+      'message',
+      'date',
+      'title',
+      'status',
+      'sid'
+    ))//    ->condition(
+    //      db_or()
+    //        ->condition('uid', $uid)
+    //        ->condition('uid', $sendler->uid)
+    //    )
+    ->condition('hm.uid', $uid)
+    ->condition('hm.sid', $sendler->uid)
+    ->orderBy('hm.date ', 'DESC')
+    ->execute()
+    ->fetchAllAssoc('id');
+
+  $massages_from = db_select('hyedesk_messenger', 'hs')
+    ->fields('hs', array(
+      'id',
+      'uid',
+      'message',
+      'date',
+      'title',
+      'status',
+      'sid'
+    ))//    ->condition(
+    //      db_or()
+    //        ->condition('uid', $uid)
+    //        ->condition('uid', $sendler->uid)
+    //    )
+    ->condition('hs.uid', $sendler->uid)
+    ->condition('hs.sid', $uid)
+    ->orderBy('hs.date ', 'DESC')
+    ->execute()
+    ->fetchAllAssoc('id');
+  $massages = array_merge($massages_for, $massages_from);
+
+  //    dpm($massages);
+  //  dpm(_array_sort_for_key_asc($massages, 'date'));
+  $massages = _array_sort_for_key_asc($massages, 'date');
+  sort($massages);
+  $massages = array_reverse($massages);
+
+  //    dpm($massages);
+
+  $output = '<h1>' . t('Messages') . '</h1>';
+  $output .= '<div id="message-header">';
+  $output .= l('<span></span>' . t('Back To All'), 'user/' . $user->uid . '/messages', array(
+    'attributes' => array(
+      'class' => array('all_massage'),
+    ),
+    'html' => TRUE,
+  ));
+  $sandler_name = $sendler->field_first_name[LANGUAGE_NONE][0]['value'];
+  $output .= '<h3>' . t('Conversation with ') . $sandler_name . '</h3>';
+  $output .= '</div>';
+  $output .= '<div id="center_message">';
+  $output .= '<div id="left_message">';
+
+
+  $form = drupal_get_form('hyedesk_messenger_send_message_form');
+  $output .= '<div id="message_form">';
+  $output .= theme('image_style', array(
+    'path' => $user->picture->uri,
+    'style_name' => 'user_40x40',
+    'attributes' => array('class' => array('circle_photo')),
+  ));
+
+  $output .= drupal_render($form);
+  $output .= '</div>';
+
+
+  //    $output .= _message_user_view($user, NULL, 'big');
+  $output .= '<div class="clearfix"></div>';
+  $output .= '<div class="mesenger_block">';
+  $rows = array();
+  $header = array('', '', '');
+
+  //  $output .=
+  foreach ($massages as $messed) {
+
+    $rows[] = array(
+      _message_image($messed),
+      $messed->message,
+      date('d M', $messed->date) . '<br />' . date('H:i', $messed->date)
+
+
+    );
+    if (($messed->status == 1) && ($messed->sid == $user->uid)) {
+      _disable_new_status($messed->id);
+    }
+
+
+  }
+
+  //  $output ,=
+  $output .= isset($rows) ? theme('table', array(
+    'header' => $header,
+    'rows' => $rows
+  )) : t('Your don\'t have any messages');
+
+  $output .= '</div>';
+  $output .= '</div>';
+  $output .= '<div id="right_message">';
+  $output .= _message_user_view($sendler, NULL, 'big');
+  $output .= '</div>';
+  $output .= '</div>';
+
+
+  //  $form = drupal_get_form('hyedesk_messenger_send_form');
+  //			$output .= ctools_modal_text_button(t('Send Message'), 'user/' . $user->uid . '/messages-send/' . $sendler->uid . '/nojs/0', t('test popup'), 'ctools-modal-first-popup-style button_link');;
+
+  return $output;
+
+
+}
+
+function _message_image($message) {
+  $user = user_load($message->uid);
+  dpm($user);
+  $ima = field_get_items('user', $user, 'field_user_avatar');
+  $image = field_view_value('user', $user, 'field_user_avatar', $ima[0], array(
+    'type' => 'image',
+    'settings' => array(
+      'image_style' => 'user_40x40', //place your image style here
+      // 'image_link' => 'content',
+    ),
+  ));
+
+
+  return render($image);
+  //    theme('image_style', array(
+  //    'path' => $user->picture->uri,
+  //    'style_name' => 'user_40x40',
+  //    'attributes' => array('class' => array('circle_photo')),
+  //  ));
+
+
+}
+
+function _disable_new_status($message_id) {
+  //  $result = FALSE;
+  $messages = hyedesk_messenger_load($message_id);
+  $messages->status = 0;
+  $messages = entity_save('hyedesk_messenger', $messages);
+  //  if ($messages) $result = TRUE;
+  //  return $result;
+}
+
+function _array_sort_for_key_asc($array, $key_array) {
+  $result = array();
+  $array_sub = array();
+  foreach ($array as $key => $value) {
+    $result[$value->$key_array] = $value;
+
+
+    //    if (!$result) {
+    //      $result[0] = $value;
+    //    }
+    //  else {
+    //      //      dpm($value);
+    //      //      dpm($result);
+    //      foreach($result as $res){
+    //        if ($value->$key_array < $res->$key_array) {
+    //
+    //
+    //        }
+    //
+    //
+    //      }
+    //
+    //    }
+
+  }
+  return $result;
+}
+
+/**1
+ * Implement hook_form()
+ */
+function hyedesk_messenger_send_message_form($form, $form_state) {
+  global $user;
+  $sid = isset($form_state['sid']) ? $form_state['sid'] : (int) arg(3);
+  $uid = $user->uid;
+  $send_user = user_load($sid);
+
+  $form['send']['title'] = array(
+    '#value' => t('Title'),
+    '#type' => 'value',
+  );
+  $form['send']['message'] = array(
+    //    '#title' => t('Message'),
+    '#type' => 'textarea',
+    '#resizable' => FALSE
+  );
+  $form['send']['uid'] = array(
+    //'#title' => t('Title'),
+    '#type' => 'value',
+    '#value' => $uid
+  );
+  $form['send']['sid'] = array(
+    //'#title' => t('Title'),
+    '#type' => 'value',
+    '#value' => $sid
+  );
+  $form['send']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Send Message'),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    //    '#submit' => array('hyedesk_messenger_send_form_submit'),
+    '#validate' => array('hyedesk_messenger_send_form_validate'),
+    '#submit' => array('hyedesk_messenger_send_message_form_submit'),
+    '#attributes' => array(
+      'class' => array(),
+    ),
+
+  );
+
+  return $form;
+
+
+}
+
+function hyedesk_messenger_send_form_validate($form, &$form_state) {
+  if ($form_state['values']['message'] == '') {
+    form_set_error('message', t('Message is empty'));
+  }
+
+
+}
+
+/**1
+ * Implement hook_form()
+ */
+function hyedesk_messenger_send_form($form, $form_state) {
+  //  heydesk_ctools_popup_style();
+  global $user;
+  $sid = isset($form_state['sid']) ? $form_state['sid'] : (int) arg(3);
+  $uid = $user->uid;
+  $send_user = user_load($sid);
+  $options_img = array(
+    'type' => 'image',
+    'label' => 'hidden',
+    'settings' => array(
+      'image_style' => 'user_40x40', //place your image style here
+      // 'image_link' => 'content',
+    ),
+    'attributes' => array('class' => array('circle_photo')),
+  );
+  $ima = field_get_items('user', $send_user, 'field_user_avatar');
+  $send_avatar = isset($img[1]) ? field_view_value('user', $send_user, 'field_user_avatar', $img[0], $options_img) : field_view_field('user', $send_user, 'field_user_avatar', $options_img);
+
+  //  $send_avatar = theme('image_style', array(
+  //    'path' => $send_user->picture->uri,
+  //    'style_name' => 'user_40x40',
+  //    'attributes' => array('class' => array('circle_photo')),
+  //  ));
+
+  //dpm($sid);
+
+  $form['send'] = array(
+    '#type' => 'fieldset',
+    //    '#title' => t('Send message for ') . '<div class="clearfix"></div>' . _message_user_view($send_user, time(), 'big') . '<div class="clearfix"></div>',
+  );
+  $node = node_load($form_state['options']);
+  $form['send']['top_element'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="short_message">',
+  );
+  $form['send']['avatar'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div style="display:inline-block; width: 40px;" class="img circle_photo">' . render($send_avatar).'</div>',
+  );
+
+
+  $form['send']['title'] = array(
+    '#value' => $node->title,
+    '#type' => 'value',
+  );
+  $form['send']['node_title'] = array(
+    '#markup' => '<div class="info"><p>' . t('My Choice: ') . $node->title . '</p></div>',
+    '#type' => 'markup',
+  );
+
+  //
+  //
+  //         <p></p>
+  //      </div>
+  //
+  //
+
+
+  $form['send']['message'] = array(
+    '#title' => t('Message'),
+    '#type' => 'textarea',
+    '#prefix' => '<p>',
+    '#resizable' => FALSE
+  );
+  $form['send']['uid'] = array(
+    //'#title' => t('Title'),
+    '#type' => 'value',
+    '#required' => TRUE,
+    '#value' => $uid
+  );
+  $form['send']['sid'] = array(
+    //'#title' => t('Title'),
+    '#type' => 'value',
+    '#required' => TRUE,
+    '#value' => $sid
+  );
+  $form['send']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Send Message'),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div></p>',
+    //    '#submit' => array('hyedesk_messenger_send_form_submit'),
+    '#ajax' => array(
+      'callback' => 'hyedesk_messenger_send_form_submit',
+    ),
+    '#attributes' => array(
+      'class' => array(),
+    ),
+
+  );
+  $form['send']['bottom_element'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div>',
+  );
+  return $form;
+}
+
+
+function hyedesk_messenger_send_form_submit($form, &$form_state) {
+  heydesk_ctools_popup_style();
+  $send_user = user_load($form_state['sid']);
+  $send_mail = isset($send_user->field_receive_e_mail_messages[LANGUAGE_NONE][0]) ? $send_user->field_receive_e_mail_messages[LANGUAGE_NONE][0]['value'] : 0;
+
+  $values = array(
+    'title' => $form_state['values']['title'],
+    'message' => $form_state['values']['message'],
+    'uid' => $form_state['values']['uid'],
+    'sid' => $form_state['values']['sid'],
+    'status' => 1,
+    'date' => time(),
+  );
+  if ($send_mail == 1) {
+    $mail_options = array();
+    $mail_options['message'] = $values['message'];
+
+    $mail = heydesk_mail_receive_mail_message($send_user, $mail_options);
+    if ($mail) {
+      $replacements = array(
+        '!user' => $send_user->name,
+        '!mail' => $send_user->mail
+      );
+      $message = 'Mail to "!user" email: "!mail" send!';
+      watchdog('instagram_pane', $message, $replacements, WATCHDOG_INFO);
+
+    }
+    else {
+      $replacements = array(
+        '!user' => $send_user->name,
+        '!mail' => $send_user->mail
+      );
+      $message = 'Mail to "!user" email: "!mail" error!';
+      watchdog('instagram_pane', $message, $replacements, WATCHDOG_ERROR);
+    }
+  }
+
+  $hyedesk_messenger = entity_create('hyedesk_messenger', $values);
+  $hyedesk_messenger = entity_save('hyedesk_messenger', $hyedesk_messenger);
+  if ($hyedesk_messenger) {
+    $commands[] = ctools_ajax_command_redirect('user/' . $values['uid'] . '/messages/' . $values['sid'] . '/message-list');
+    $commands[] = ctools_modal_command_dismiss();
+    print ajax_render($commands);
+    exit;
+  }
+
+}
+
+function hyedesk_messenger_send_message_form_submit($form, &$form_state) {
+
+  $send_user = user_load($form_state['values']['sid']);
+  $send_mail = isset($send_user->field_receive_e_mail_messages[LANGUAGE_NONE][0]) ? $send_user->field_receive_e_mail_messages[LANGUAGE_NONE][0]['value'] : 0;
+
+  $values = array(
+    'title' => $form_state['values']['title'],
+    'message' => $form_state['values']['message'],
+    'uid' => $form_state['values']['uid'],
+    'sid' => $form_state['values']['sid'],
+    'status' => 1,
+    'date' => time(),
+  );
+  if ($send_mail == 1) {
+    $mail_options = array();
+    //    $mail_options['message'] = $values['message'];
+    $mail_options = 'massage';
+    dpm($send_user);
+
+
+    $mail = heydesk_mail_receive_mail_message($send_user, $mail_options);
+    if ($mail) {
+      $replacements = array(
+        '!user' => $send_user->name,
+        '!mail' => $send_user->mail
+      );
+      $message = 'Mail to "!user" email: "!mail" send!';
+      watchdog('instagram_pane', $message, $replacements, WATCHDOG_INFO);
+
+    }
+    else {
+      $replacements = array(
+        '!user' => $send_user->name,
+        '!mail' => $send_user->mail
+      );
+      $message = 'Mail to "!user" email: "!mail" error!';
+      watchdog('instagram_pane', $message, $replacements, WATCHDOG_ERROR);
+    }
+  }
+
+  $hyedesk_messenger = entity_create('hyedesk_messenger', $values);
+  $hyedesk_messenger = entity_save('hyedesk_messenger', $hyedesk_messenger);
+  if ($hyedesk_messenger) {
+
+    drupal_set_message(t('Message Send'));
+    //    heydesk_system_massage_callback(t('Message Send'), 'ajax');
+    //    $commands[] = ctools_ajax_command_redirect('user/' . $values['uid'] . '/messages/' . $values['sid'] . '/message-list');
+    //    $commands[] = ctools_modal_command_dismiss();
+    //    print ajax_render($commands);
+    //    exit;
+  }
+
+}
+
+function hyedesk_messenger_list() {
+  global $user;
+  if (arg(1) == $user->uid) {
+
+    //    $entitys = db_select('hyedesk_messenger', 'hm')
+    //      ->fields('hm')
+    //      ->condition(db_or()
+    //        ->condition('uid', $user->uid)
+    //        ->condition('sid', $user->uid))//      ->orderBy('hm.date ', 'DESC')
+    //      ->execute()
+    //      ->fetchAllAssoc('id');
+
+    $entitys = entity_load('hyedesk_messenger');
+    $my_messages = array();
+    $array_sendler = array();
+    foreach ($entitys as $my_message) {
+      if //          (($my_message->uid == $user->uid) ||
+      ($my_message->sid == $user->uid
+      ) //          )
+      {
+        $my_messages[$my_message->id] = $my_message;
+      }
+    }
+
+
+    //            dpm($entitys);
+
+
+    $link_inactive_all = l('<div class="dots"></div>', 'message/inactive/all', array(
+      'html' => TRUE,
+      'attributes' => array(
+        'class' => array(
+          'dot',
+          'use-ajax'
+        )
+      )
+    ));
+    $output = '<h1>' . t('Messages') . '</h1>';
+    $header = array(
+      '',
+      '',
+      '',
+      '',
+      '<div class="mark_all_read">' . ('Mark All Read') . $link_inactive_all . '</div>',
+    );
+    $entity = array();
+    $count_mess = array();
+    foreach ($my_messages as $message) {
+      //      dpm($message);
+      $count_mess[$message->uid] = isset($count_mess[$message->uid]) ? $count_mess[$message->uid] : 0;
+
+      if (!isset($entity[$message->uid])) {
+        $array_sendler[$message->uid] = $message->uid;
+        $entity[$message->uid] = $message;
+        //        $count_mess[$message->sid] = $message->status == 1 ? 1 : 0;
+        $count_mess[$message->uid]++;
+      }
+      elseif ($entity[$message->uid]->date < $message->date) {
+        $entity[$message->uid] = $message;
+        //        $count_mess[$message->sid] = $message->status == 1 ? $count_mess[$message->sid] + 1 : $count_mess[$message->sid];
+        $count_mess[$message->uid]++;
+      }
+      $_SESSION['message'][$message->uid] = $count_mess[$message->uid];
+    }
+
+
+    $count_mess = array();
+    foreach ($entitys as $value) {
+      if (($value->uid == $user->uid) && (!array_key_exists($value->sid, $array_sendler))) {
+        $count_mess[$value->sid] = isset($count_mess[$value->sid]) ? $count_mess[$value->sid] : 0;
+
+        if (!isset($entity[$value->sid])) {
+          $entity[$value->sid] = $value;
+          //        $count_mess[$message->sid] = $message->status == 1 ? 1 : 0;
+          $count_mess[$value->sid]++;
+        }
+        elseif ($entity[$value->sid]->date < $value->date) {
+          $entity[$value->sid] = $value;
+          //        $count_mess[$message->sid] = $message->status == 1 ? $count_mess[$message->sid] + 1 : $count_mess[$message->sid];
+          $count_mess[$value->sid]++;
+        }
+
+
+        $_SESSION['message'][$value->sid] = $count_mess[$value->sid];
+      }
+
+
+    }
+
+    foreach ($entity as $key => $value) {
+      foreach ($entitys as $key2 => $value2) {
+        if (($key == $value2->sid) && ($value2->uid == $value->sid)) {
+          $_SESSION['message'][$key]++;
+          if ($value->date < $value2->date) {
+            $entity[$key] = $value2;
+          }
+        }
+      }
+    }
+
+    //    dpm($_SESSION['message']);
+    $last_entity = array();
+    //    foreach ($entity as $key => $value) {
+    //      if ($key != $user->uid) {
+    //        $last_entity[$key] = $value;
+    //      }
+    //
+    //    }
+
+    foreach ($entity as $key => $mess) {
+      //      dpm($mess);
+      $class_new = (($mess->status == 1) && ($mess->uid != $user->uid)) ? 'red-background' : '';
+
+      $sendler_id = $mess->sid != $user->uid ? $mess->sid : $mess->uid;
+      $sendler = user_load($sendler_id);
+      if ($sendler) {
+        $sity = isset($sendler->field_sities[LANGUAGE_NONE][0]['tid']) ? _term_name($sendler->field_sities[LANGUAGE_NONE][0]['tid']) : '';
+        $countres = isset($sendler->field_country[LANGUAGE_NONE][0]['tid']) ? _term_name($sendler->field_country[LANGUAGE_NONE][0]['tid']) : '';
+        $country = $sity . ' ' . $countres;
+        $path_from = $mess->sid != $user->uid ? $mess->sid : $mess->uid;
+        $path = 'user/' . $user->uid . '/messages/' . $path_from . '/message-list';
+        $link_innew = l('<div class="dot"></div>', 'message/inactive/' . $sendler_id, array(
+          'html' => TRUE,
+          'attributes' => array(
+            'class' => array(
+              'dot',
+              'use-ajax'
+            )
+          )
+        ));
+        $rows[$key] = array(
+          'data' => array(
+            array(
+              'data' => //        _heydesk_user_full_name($sendler),
+                $sendler->field_first_name[LANGUAGE_NONE][0]['value'] . ' ' . $sendler->field_surname[LANGUAGE_NONE][0]['value'],
+              'class' => 'name'
+            ),
+            array(
+              'data' => theme('image_style', array(
+                'path' => $sendler->picture->uri,
+                'style_name' => 'user_40x40',
+                'attributes' => array('class' => array('circle_photo')),
+              )),
+              'class' => array('photo')
+            ),
+            array(
+              'data' => theme_link(array(
+                'text' => '<div class="messag">' . $mess->message . '</div>',
+                'path' => $path,
+                'options' => array(
+                  'attributes' => array(
+                    'class' => array('message_link', 'black_link'),
+                  ),
+                  'html' => TRUE,
+                ),
+              )),
+              'class' => array('message')
+            ),
+            array(
+              'data' => '<div class="address"><div class="street">' . $sendler->field_address[LANGUAGE_NONE][0]['value'] . '</div><div class="country">' . $country . '</div></div>',
+              'class' => 'address',
+            ),
+            '<div class="loas">' . $_SESSION['message'][$sendler_id] . $link_innew . '</div>',
+
+          ),
+          'class' => array('row-' . $sendler_id, $class_new),
+        );
+      }
+    }
+
+
+    $output .= isset($rows) ? theme('table', array(
+      'header' => $header,
+      'rows' => $rows
+    )) : t('Your don\'t have any messages');
+
+    return $output;
+  }
+  else {
+    drupal_goto('user/' . $user->uid . '/messages/');
+  }
+}
+
+//function heydesk_message_button_form($form, $form_state) {
+//
+//  $form[]
+//}
+function hyedesk_messenger_send_form_callback($user, $sendler, $js = NULL, $options = NULL) {
+  if (!$js) {
+    return drupal_get_form('hyedesk_messenger_send_form');
+  }
+  heydesk_ctools_popup_style();
+
+  $form_state = array(
+    'ajax' => TRUE,
+    'title' => t('Form title'),
+    'uid' => $user->uid,
+    'sid' => $sendler,
+    'options' => $options,
+  );
+  $output = ctools_modal_form_wrapper('hyedesk_messenger_send_form', $form_state);
+  print ajax_render($output);
+  drupal_exit();
+}

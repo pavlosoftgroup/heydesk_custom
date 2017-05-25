@@ -1,0 +1,681 @@
+<?php
+function heydesk_right_prop_init() {
+  //  drupal_add_js(drupal_get_path('module', 'heydesk_right_prop') . '/js/LoadMap.js');
+  //  drupal_add_js(drupal_get_path('module', 'heydesk_right_prop') . '/js/require.js');
+  //  drupal_add_js(drupal_get_path('module', 'heydesk_right_prop') . '/js/heydesk-map.js');
+  // drupal_add_js(drupal_get_path('module', 'heydesk_right_prop') . '/js/heydesk-map-api.js');
+  drupal_load('module', 'heydesk_custom_function');
+  drupal_load('module', 'heydesk_external_api');
+}
+
+
+//require_once(file_create_url(drupal_get_path('module', 'heydesk_custom_function') . '/heydesk_custom_function.module'));
+
+/**
+ *  Implements hook_block_info()
+ */
+function heydesk_right_prop_block_info() {
+
+  $blocks['order_form'] = array(
+    'info' => t('Proposal Order Block'),
+    'status' => TRUE,
+    'region' => 'right_column',
+    'weight' => 0,
+    'visibility' => 1
+  );
+  $blocks['google_map'] = array(
+    'info' => t('Proposal Google Map Block'),
+    'status' => TRUE,
+    'region' => 'right_column',
+    'weight' => 0,
+    'visibility' => 1
+  );
+  $blocks['views_google_map'] = array(
+    'info' => t('Proposal Google Map Field'),
+    'status' => TRUE,
+    'region' => 'right_column',
+    'weight' => 0,
+    'visibility' => 1
+  );
+  $blocks['proposal_order'] = array(
+    'info' => t('Proposal Order Right Block'),
+    'status' => TRUE,
+    'region' => 'right_column',
+    'weight' => 0,
+    'visibility' => 1
+  );
+  $blocks['proposal_user'] = array(
+    'info' => t('Proposal User Right Block'),
+    'status' => TRUE,
+    'region' => 'right_column',
+    'weight' => 5,
+    'visibility' => 1
+  );
+  $blocks['user_top_panel'] = array(
+    'info' => t('User Top Panel'),
+    'status' => TRUE,
+    'region' => 'top_login',
+    'weight' => 0,
+    'visibility' => 0
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view()
+ */
+function heydesk_right_prop_block_view($delta = '') {
+
+  switch ($delta) {
+    case 'order_form':
+      $block['subject'] = t('Proposal Order Block');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+    case 'google_map':
+      $block['subject'] = t('Proposal Google Map Block');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+    case 'views_google_map':
+      $block['subject'] = t('Proposal Google Map Field');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+    case 'proposal_order':
+      $block['subject'] = t('Proposal Order Right Block');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+    case 'proposal_user':
+      $block['subject'] = t('Proposal User Right Block');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+    case 'user_top_panel':
+      $block['subject'] = t('User Top Panel');
+      $block['content'] = heydesk_right_prop_block_content($delta);
+      return $block;
+      break;
+  }
+}
+
+
+/**
+ *  Function realised view content block, defined in module
+ */
+function heydesk_right_prop_block_content($delta) {
+  global $user;
+  switch ($delta) {
+    case 'proposal_user':
+      $uid = db_select('node', 'n')
+        ->fields('n', array('uid'))
+        ->condition('n.nid', arg(1))
+        ->execute()
+        ->fetchField();
+      $proposal_user = user_load($uid);
+      // dpm($proposal_user);
+      $img_mess = theme_image(array(
+        'path' => drupal_get_path('theme', 'heydesk') . '/images/message.png',
+        'attributes' => array('class' => array('message')),
+      ));
+      $img_prof = theme_image(array(
+        'path' => drupal_get_path('theme', 'heydesk') . '/images/profile.png',
+        'attributes' => array('class' => array('profile'))
+      ));
+
+      $output = '<div class="row">';
+      $output .= '<div class="col">';
+      $output .= theme('image_style', array(
+        'path' => isset($proposal_user->field_user_avatar[LANGUAGE_NONE]) ? file_uri_target($proposal_user->field_user_avatar[LANGUAGE_NONE][0]['uri']) : file_uri_target('public://no-images.jpg'),
+        'style_name' => 'user_150x150',
+      ));
+
+      $surname = isset($proposal_user->field_surname[LANGUAGE_NONE][0]['value']) ? $proposal_user->field_surname[LANGUAGE_NONE][0]['value'] : '';
+      $firstname = isset($proposal_user->field_first_name[LANGUAGE_NONE][0]['value']) ? $proposal_user->field_first_name[LANGUAGE_NONE][0]['value'] : '';
+
+      $output .= '</div>';
+      $output .= '<div class="col">';
+      $output .= '<h3>' . $surname . ' ' . $firstname . '</h3>';
+      $output .= '<p>';
+      $output .= isset($proposal_user->field_profile_text_[LANGUAGE_NONE][0]['value']) ? $proposal_user->field_profile_text_[LANGUAGE_NONE][0]['value'] : '';
+      $output .= '</p>';
+      $output .= l($img_prof . t('View Profile'), 'user/' . $uid, array(
+        'attributes' => array(
+          'class' => array('blocks'),
+        ),
+        'html' => TRUE,
+      ));
+      if (($user->uid == $uid) || ($user->uid == 0)) {
+        $output .= '<span class="same_message">' . $img_mess . '</span>';
+      }
+      else {
+
+
+        heydesk_ctools_popup_style();
+
+        $output .= l($img_mess . t('Send Message'), 'user/' . $user->uid . '/messages-send/' . $uid . '/nojs/' . arg(1), array(
+          'attributes' => array(
+            'class' => array(
+              'blocks',
+              'ctools-modal-first-popup-style',
+              'ctools-use-modal',
+
+            ),
+          ),
+          'html' => TRUE,
+        ));
+      }
+      $output .= '</div>';
+      $output .= '</div>';
+
+
+      return $output;
+      break;
+
+    case 'user_top_panel':
+      global $user;
+      $user = user_load($user->uid);
+      $block = module_invoke('hyedesk_messenger', 'hyedesk_messenger_info');
+      $messages_block = render($block['content']);
+      $user_menu = module_invoke('hyedesk_user', 'heydesk_user_account_links');
+      $user_menu_block = render($user_menu['content']);
+      $output = '';
+      $output .= l(t('How It Works'), drupal_get_path_alias('node/103'), array('class' => 'how-it-works'));
+      $output .= '<span></span>';
+      $block = module_invoke('hyedesk_messenger', 'block_view', 'hyedesk_messenger_info');
+      $output .= render($block['content']);
+      if (isset(user_load($user->uid)->picture->uri)) {
+        $options_img = array(
+          'type' => 'image',
+          'label' => 'hidden',
+          'settings' => array(
+            'image_style' => 'user_40x40',
+//            'image_link' => 'content', // content, file
+          )
+        );
+
+        $img = field_get_items('user', $user, 'field_user_avatar');
+        $picture = isset($img[1]) ? field_view_value('user', $user, 'field_user_avatar', $img[0], $options_img) : field_view_field('user', $user, 'field_user_avatar', $options_img);
+        $picture = '<div class="inline user_avatar">'. render($picture).'</div>';
+//        dpm($picture);
+
+
+//        $picture = theme_image(array(
+//            'style_name' => 'user_40x40',
+//          'path' => user_load($user->uid)->picture->uri,
+//          'width' => '40px',
+//          'height' => '40px',
+//          'attributes' => array(
+//            'class' => array('user_avatar')
+//          )
+//          //   'attributes' => array('class' => 'img-responsive')
+//        ));
+      }
+      else {
+        $picture = theme_image(array(
+          //  'style_name' => 'user_40x40',
+          'path' => drupal_get_path('module', 'heydesk_user') . '/images/logo_nofont.png',
+          'width' => '40px',
+          'height' => '40px',
+          'attributes' => array(
+            'class' => array('user_avatar')
+          )
+          //   'attributes' => array('class' => 'img-responsive')
+        ));
+
+      }
+      $output .= $messages_block;
+      $output .= $picture;
+      $output .= $user_menu_block;
+      return $output;
+      break;
+
+    case 'proposal_order':
+      $node = node_load(arg(1));
+
+      $ima = field_get_items('node', $node, 'field_photos');
+      $image = field_view_value('node', $node, 'field_photos', $ima[0], array(
+        'type' => 'image',
+        'settings' => array(
+          'image_style' => 'proposal_590x380', //place your image style here
+          // 'image_link' => 'content',
+        ),
+      ));
+//      $image = theme('image_style', array(
+//        'style_name' => 'proposal_590x380',
+//        'path' => $node->field_photos[LANGUAGE_NONE][0]['uri'],
+//        'attributes' => array('class' => 'img-responsive')
+//      ));
+      $output = ' <h4>' . $node->title . '</h3>';
+      $output .= '<p class="pull-left">' . _term_name($node->field_sities[LANGUAGE_NONE][0]['tid']) . ' Area, ' . _term_name($node->field_country[LANGUAGE_NONE][0]['tid']) . '</p>';
+      $output .= '<div class="pull-right"><div class="stars-block">' . _heydesk_stars_output($node->nid) . '</div></div>';
+      $output .= render($image);
+      return $output;
+    case 'order_form':
+      return drupal_get_form('heydesk_order_form');
+      break;
+    case 'google_map' :
+      $node = node_load(arg(1));
+      $city = isset($node->field_sities[LANGUAGE_NONE][0]['taxonomy_term']->name) ? $node->field_sities[LANGUAGE_NONE][0]['taxonomy_term']->name : '';
+      $counrty = isset($node->field_country[LANGUAGE_NONE][0]['taxonomy_term']->name) ? $node->field_country[LANGUAGE_NONE][0]['taxonomy_term']->name : '';
+
+      $address = '+';
+      $address .= str_replace(' ', '+', $node->field_address[LANGUAGE_NONE][0]['value']);
+      $address .= ', +';
+      $address .= $city;
+      $address .= ', +';
+      $address .= $counrty;
+      $output = google_map_block_render($address);
+      //  $output .= '<script src="js/require.js" data-main="js/heydesk-map.js"></script>';
+      return $output;
+      break;
+    case 'views_google_map' :
+      ////      $node = node_load(arg(1));
+      //
+      //      $address = '+';
+      //      $address .= str_replace(' ', '+', $node->field_address[LANGUAGE_NONE][0]['value']);
+      //      $address .= ', +';
+      //      $address .= $node->field_sities[LANGUAGE_NONE][0]['taxonomy_term']->name;
+      //      $address .= ', +';
+      //      $address .= $node->field_country[LANGUAGE_NONE][0]['taxonomy_term']->name;
+      //      $output = google_map_block_render($address);
+      //      //  $output .= '<script src="js/require.js" data-main="js/heydesk-map.js"></script>';
+      //
+      //      $block_id = 'proposal-map-' . $nid;
+      //      drupal_add_js(array('heydesk_external_api' => array('placeToShow' => $address)), 'setting');
+      //      drupal_add_js(array('heydesk_external_api' => array('idBlockMmap' => $block_id)), 'setting');
+      //      drupal_add_js(drupal_get_path('module', 'heydesk_external_api') . '/js/init-map.js');
+      //
+      //      $output = '<div id="' . $block_id . '" class="multiple-proposal-map" style="width:100%; height: 100%;"></div>';
+      //      return $output;
+      break;
+  }
+}
+
+/**
+ * Implements hook_form()
+ */
+
+function heydesk_order_form($form, $form_state) {
+  global $account;
+  global $user;
+  $node = node_load(arg(1));
+  drupal_add_library('system', 'drupal.ajax');
+  //  ctools_include('modal');
+  ctools_include('ajax');
+  $favorite = db_select('heydesk_favorite', 'hf')
+    ->fields('hf', array('id'))
+    ->condition('hf.uid', $user->uid)
+    ->condition('hf.pid', $node->nid)
+    ->execute()
+    ->fetchCol();
+  dpm($node);
+  dpm(user_load($user->uid));
+
+  if ($user->uid == 0) {
+    $favorite_link = array(
+      '#type' => 'link',
+      '#title' => t('Add to Favorites'),
+      '#href' => NULL,
+      '#suffix' => ' <span class="add_like"></span>',
+      '#options' => array(
+        'attributes' => array(
+          'class' => array(
+            'log-in-list-now'
+          )
+        )
+      )
+
+    );
+
+
+  }
+
+  elseif ($favorite) {
+
+    $favorite_link = array(
+      '#type' => 'link',
+      '#title' => t('Remove from Favorites'),
+      '#suffix' => ' <span class="remove_like"></span>',
+      '#href' => 'proposal/' . $node->nid . '/favorite/remove/nojs',
+      '#ajax' => array(
+        'callback' => 'heydesk_favorite_page_callback',
+        'wrapper' => 'favorite',
+        'method' => 'replace',
+        'effect' => 'fade',
+      ),
+
+    );
+
+  }
+  else {
+
+
+    $favorite_link = array(
+      '#type' => 'link',
+      '#title' => t('Add to Favorites'),
+      '#href' => 'proposal/' . $node->nid . '/favorite/add/nojs',
+      '#suffix' => '<span class="add_like"></span>',
+      '#ajax' => array(
+        'callback' => 'heydesk_favorite_page_callback',
+        'wrapper' => 'favorite',
+        'method' => 'replace',
+        'effect' => 'fade',
+      ),
+    );
+
+
+  }
+
+
+  // Using the onload below is entirely optional; It's just included as
+  // a reminder of an easy way to add extra simple jQuery tricks.
+  //    '#attributes' => array(
+  //      'onload' => "jQuery('something-to-hide').hide();",
+  //    ),
+  //  $favorite_link = l(t('Add to Favorites') . '<span class="add_like"></span>', 'proposal/' . $node->nid . '/favorite/add/nojs', array(
+  //    'html' => TRUE,
+  //    'attributes' => array(
+  //      'class' => array('use-ajax'),
+  //      'rel' => '#favorite',
+  //    ),
+  //  ));
+  $city = isset($node->field_sities[LANGUAGE_NONE][0]['taxonomy_term']->name) ? $node->field_sities[LANGUAGE_NONE][0]['taxonomy_term']->name : '';
+  $counrty = isset($node->field_country[LANGUAGE_NONE][0]['taxonomy_term']->name) ? $node->field_country[LANGUAGE_NONE][0]['taxonomy_term']->name : '';
+  $price = isset($node->field_price[LANGUAGE_NONE][0]['value']) ? $node->field_price[LANGUAGE_NONE][0]['value'] : 0;
+  drupal_add_js(array('price' => $price), 'setting');
+  $area = $city . ' Area,' . $counrty;
+  $header_form = '<div>';
+  $header_form .= '<div class="block_left">';
+  $header_form .= '<h3>';
+  $header_form .= $node->title;
+  $header_form .= '</h3>';
+  $header_form .= '<p>';
+  $header_form .= $area;
+  $header_form .= '</p>';
+  $header_form .= '</div>';
+  $header_form .= '<div class="block_right">';
+  $header_form .= '<p class="share-link">';
+  heydesk_ctools_popup_style();
+  $options = array(
+    'label' => 'hidden',
+    'type' => 'text_summary_or_trimmed',
+    'settings' => array('trim_length' => 150),
+  );
+  $description_share = field_view_field('node', $node, 'body', $options);
+  dpm($description_share);
+
+  $class_share_link = $user->uid == 0 ? array('log-in-list-now') : array(
+    'use-ajax',
+    'ctools-use-modal',
+    'ctools-modal-modal-popup-medium'
+  );
+  $path_share_link = $user->uid == 0 ? '' : 'share-popup/' . $node->nid . '/nojs';
+
+  $share_link = l(t('Share'), $path_share_link, array(
+    'attributes' => array(
+      'class' => $class_share_link,
+    ),
+  ));
+
+  //  'https://www.facebook.com/sharer/sharer.php?u=http%3A//heydesk.it-dev-lab.com/node/'
+  //<a class="use-ajax ctools-use-modal" href="https://www.facebook.com/sharer/sharer.php?u=http%3A//heydesk.it-dev-lab.com/node/60">Share<span class="share_like"></span></a></p>';
+  $header_form .= $share_link;
+  l(t('Share'), //    'share/facebook/nojs/' .$node->nid ,
+    //    'https://www.facebook.com/dialog/share?app_id=447866848934386&display=popup&href=http%3A%2F%2Fheydesk.it-dev-lab.com%2Fnode%2F' . $node->nid,
+    //'#',
+    'https://www.facebook.com/sharer/sharer.php?u=http%3A%2F%2Fheydesk.it-dev-lab.com%2Fnode%2F' . $node->nid . '&amp;src=sdkpreparse&app_id=447866848934386&display=iframe', //render($description_share[0]),
+    array(
+      'attributes' => array(
+        'target' => '_blank',
+        //      'onclick' => 'https://www.facebook.com/sharer/sharer.php?u=http://heydesk.it-dev-lab.com/node/' . $node->nid . '&amp;src=sdkpreparse&app_id=447866848934386&display=iframe',
+        //        'id' => 'share-link',
+        'class' => array(
+          //         'use-ajax',
+          //                   'ctools-use-modal',
+          //          'ctools-modal-share-popup-style'
+
+        )
+      )
+    ));
+  $header_form .= '<span></span>';
+  $header_form .= '</p>';
+  $header_form .= '<div id="favorite">';
+  $header_form .= '<div>';
+  $header_form .= render($favorite_link);
+  //  $header_form .= render($favorite_link);
+  $header_form .= '</div>';
+  $header_form .= '</div>';
+  $header_form .= '<p>' . (isset($node->field_stars[LANGUAGE_NONE][0]['value']) ? _heydesk_stars_output($node->field_stars[LANGUAGE_NONE][0]['value']) : _heydesk_stars_output(0));
+  $header_form .= '</p>';
+  $header_form .= '</div>';
+  $header_form .= '</div>';
+  $header_form .= '';
+  //  <a href="https://www.facebook.com/sharer/sharer.php?u=URLENCODED_URL&t=TITLE"
+  //   onclick="javascript:window.open(this.href, '', 'menubar=no,toolbar=no,resizable=yes,scrollbars=yes,height=300,width=600');return false;"
+  //   target="_blank" title="Share on Facebook">
+  //</a>
+
+
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => $header_form,
+  );
+  $form['time'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['time']['date_from'] = array(
+    '#type' => 'textfield',
+    //'#default_value' => t('Select Date'),
+    '#attributes' => array(
+      'class' => array('date-from'),
+      'placeholder' => t('Select Date')
+    ),
+    '#required' => TRUE,
+
+  );
+  $form['time']['calendar_from'] = array(
+    '#type' => 'markup',
+    '#markup' => heydesk_calendar_mini($node->nid),
+  );
+  $form['time']['at_from'] = array(
+    '#type' => 'markup',
+    '#markup' => t('At'),
+  );
+  $form['time']['from_val'] = array(
+    '#type' => 'textfield',
+    '#attributes' => array(
+      'class' => array(
+        'hidden'
+      )
+    )
+  );
+
+  $form['time']['from'] = array(
+    '#type' => 'select',
+    '#options' => _heydesk_time_array(),
+  );
+
+  $form['time']['date_to'] = array(
+    '#type' => 'textfield',
+    // '#default_value' => t('Select Date'),
+    '#attributes' => array(
+      'class' => array('date-to'),
+      'placeholder' => t('Select Date')
+    ),
+    '#required' => TRUE,
+  );
+  $form['time']['to_val'] = array(
+    '#type' => 'textfield',
+    '#attributes' => array(
+      'class' => array(
+        'hidden'
+      )
+    )
+  );
+  $form['time']['calendar_to'] = array(
+    '#type' => 'markup',
+    '#markup' => heydesk_calendar_mini($node->nid, date('n'), 'date_to'),
+  );
+  $form['time']['at_to'] = array(
+    '#type' => 'markup',
+    '#markup' => t('At'),
+  );
+  $form['time']['to'] = array(
+    '#type' => 'select',
+    '#options' => array_reverse(_heydesk_time_array()),
+  );
+  $availability = isset($node->field_availability[LANGUAGE_NONE][0]['value']) ? $node->field_availability[LANGUAGE_NONE][0]['value'] : 0;
+  $availability = $availability > 50 ? 50 : $availability;
+  //  if ($availability != 0) {
+  $form['time']['availability'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Availability: ') . $availability . ' seats left',
+  );
+
+
+  //    $options = range(1, $availability);
+  $form['time']['persons'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Persons: '),
+    '#attributes' => array('placeholder' => 0),
+    '#prefix' => '<div class="div_persons">',
+    '#suffix' => '</div>',
+  );
+  //      $form['time']['persons_val'] = array(
+  //        '#type' => 'textfield',
+  //        '#default_value' => 1,
+  //        '#attributes' =>array(
+  //          'class' => array(
+  //            'hidden'
+  //          )
+  //        )
+  //      );
+  //  }
+  $form['price'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['price']['renting_price'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Renting Price') . '<div class="big_text"><span id="renting-day">0</span>    ' . t('Day') . '</div>',
+  );
+  $form['price']['renting_val'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+    '#attributes' => array(
+      'id' => 'count_day'
+    ),
+  );
+  $form['price']['price_one'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+    '#attributes' => array(
+      'id' => 'price-one'
+    ),
+  );
+  $form['price']['summa'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="right">' . t('$') . '<div id="sum-price">000</div>,-</div>',
+  );
+  $form['price']['price_value'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+    '#attributes' => array('id' => 'price-value'),
+  );
+  $form['emprty_button'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="empty-button"></div>'
+
+  );
+  $class_link_login = ($user->uid == 0) ? 'stop__action' : '';
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Start Booking'),
+    '#prefix' => '<a>',
+    '#suffix' => '</a>',
+    '#action' => array('heydesk_order_form_submit'),
+    '#attributes' => array(
+      'class' => array(
+        $class_link_login,
+      ),
+    ),
+  );
+  return $form;
+}
+
+function heydesk_order_form_submit($form, &$form_state) {
+  dpm($form_state);
+  $_SESSION['date_from'] = $form_state['values']['date_from'];
+  $_SESSION['time_from'] = $form_state['values']['from_val'];
+  $_SESSION['date_to'] = $form_state['values']['date_to'];
+  $_SESSION['time_to'] = $form_state['values']['to_val'];
+  $_SESSION['price'] = $form_state['values']['price_value'];
+  $_SESSION['col_day'] = $form_state['values']['renting_val'];
+  $_SESSION['persons'] = isset($form_state['values']['persons_val']) ? $form_state['values']['persons_val'] : 1;
+  unset($_SESSION['form_value']);
+  $_SESSION['form_step'] = 1;
+  $form_state['redirect'] = 'proposal-order/' . arg(1);
+
+}
+
+/**
+ * @param int $value scale value stars
+ * @return string html
+ */
+function _heydesk_stars_output($value = 0) {
+  $output = '';
+  for ($i = 0; $i < 5; $i++) {
+    if ($value == 0) {
+      $output .= '<i class="fa fa-star-o" aria-hidden="true"></i>';
+    }
+    else {
+      $output .= '<i class="fa fa-star" aria-hidden="true"></i>';
+      $value--;
+    }
+  }
+  return $output;
+}
+
+/**
+ * @return array values for time select list
+ * autor #Anton_Martsyniuk
+ */
+function _heydesk_time_array() {
+
+  $a = 7;
+  $b = 0;
+  $array = [];
+  $string = '';
+  $str = '';
+  $x = 0;
+
+  for ($i = 1; $i < 100; $i++) {
+    if ($b == 60) {
+      $b = 0;
+    }
+    if ($a == 21) {
+      $string = $a . '_' . $b . '0';
+      $str = $a . ':' . $b . '0';
+      $x = 1;
+    }
+    if ($b == 0) {
+      $string = $a . '_' . $b . '0';
+      $str = $a . ':' . $b . '0';
+    }
+    else {
+      $string = $a . '_' . $b;
+      $str = $a . ':' . $b;
+    }
+    if (is_int($i / 4)) {
+      $a += 1;
+    }
+    $b += 15;
+    $array[$string] = $str;
+    if ($x == 1) {
+      break;
+    }
+  }
+  return $array;
+}
+

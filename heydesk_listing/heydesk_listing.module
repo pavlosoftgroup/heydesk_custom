@@ -1,0 +1,622 @@
+<?php
+module_load_include('inc', 'heydesk_listing', 'heydesk_features/heydesk_features');
+
+function heydesk_listing_menu() {
+  $items['listing-print/%/pdf'] = array(
+    'title' => t('Prunt'),
+    'description' => t('Print page'),
+    'page callback' => 'heydesk_listing_print_pdf_callback',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['listing/%/%ctools_js'] = array(
+    'title' => t('Listing Overview'),
+    'page callback' => 'heydesk_listing_overview_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['booking-print/%/pdf'] = array(
+    'title' => t('Booking Overview'),
+    'page callback' => 'heydesk_booking_print_pdf_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['booking/%/%ctools_js'] = array(
+    'title' => t('Booking Overview'),
+    'page callback' => 'heydesk_booking_overview_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['listing-status/%/%ctools_js'] = array(
+    'title' => t('Booking status reload'),
+    'page callback' => 'heydesk_booking_status_reload_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+    //    'menu_name' => 'menu-profile'
+  );
+  $items['listing-status-operator/%/%/%ctools_js'] = array(
+    'title' => t('Booking status ovewvrite'),
+    'page callback' => 'heydesk_booking_status_overwrite_callback',
+    'page arguments' => array(1, 2, 3),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+    //    'menu_name' => 'menu-profile'
+  );
+  return $items;
+}
+
+//register
+function heydesk_listing_entity_info() {
+  return array(
+    'heydesk_listing' => array(
+      'label' => t('Listing'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'views controller class' => 'EntityDefaultViewsController',
+      'base table' => 'heydesk_listing',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      //    'admin ui' => array(
+      //      'path' => 'admin/config/heydesk/messenger'
+      //    ),
+      'access callback' => 'hyedesk_messenger_access',
+      'module' => 'heydesk_listing',
+    ),
+  );
+}
+
+function heydesk_listing_theme($existing, $type, $theme, $path) {
+  $theme = array();
+
+  $theme['heydesk_listing_overview'] = array(
+    'variables' => array(
+      'listing' => NULL,
+    ),
+    'template' => 'heydesk-listing-overview-popup',
+    'path' => drupal_get_path('module', 'heydesk_listing') . '/theme',
+  );
+
+  $theme['heydesk_booking_overview'] = array(
+    'variables' => array(
+      'booking' => NULL,
+    ),
+    'template' => 'heydesk-booking-overview-popup',
+    'path' => drupal_get_path('module', 'heydesk_listing') . '/theme',
+  );
+
+  $theme['heydesk_listing_print'] = array(
+    'variables' => array(
+      'listing' => NULL,
+    ),
+    'template' => 'heydesk-listing-print-pdf',
+    'path' => drupal_get_path('module', 'heydesk_listing') . '/theme',
+  );
+
+  $theme['heydesk_booking_print'] = array(
+    'variables' => array(
+      'booking' => NULL,
+    ),
+    'template' => 'heydesk-booking-print-pdf',
+    'path' => drupal_get_path('module', 'heydesk_listing') . '/theme',
+  );
+
+  return $theme;
+}
+
+function heydesk_listing_overview_callback($nid, $js = NULL) {
+  if (!empty($nid)) {
+    $listing = heydesk_listing_load($nid);
+    heydesk_ctools_popup_style();
+    $output = theme('heydesk_listing_overview', array('listing' => $listing));
+    $command = ctools_modal_command_display('html', $output);
+  }
+  print ajax_render($command);
+  // print $output;
+  drupal_exit();
+}
+
+function heydesk_listing_print_pdf_callback($nid) {
+  if (!empty($nid)) {
+    $listing = heydesk_listing_load($nid);
+    $output = theme('heydesk_listing_print', array('listing' => $listing));
+    pdf_using_mpdf_api($output);
+  }
+}
+
+function heydesk_booking_overview_callback($nid, $js = NULL) {
+  if (!empty($nid)) {
+    $booking = heydesk_listing_load($nid);
+    heydesk_ctools_popup_style();
+    $output = theme('heydesk_booking_overview', array('booking' => $booking));
+    $command[] = ctools_modal_command_display('html', $output);
+  }
+  print ajax_render($command);
+  // print $output;
+  drupal_exit();
+}
+
+function heydesk_booking_print_pdf_callback($nid) {
+  if (!empty($nid)) {
+    $booking = heydesk_listing_load($nid);
+    $output = theme('heydesk_booking_print', array('booking' => $booking));
+    pdf_using_mpdf_api($output);
+  }
+}
+
+function heydesk_booking_status_reload_callback($bid, $js = NULL) {
+  $html = '<div class="listing_status_button">';
+  $array_status = array(
+    0 => 'rejected',
+    //    1 => 'pending',
+    2 => 'approved',
+  );
+  foreach ($array_status as $key => $value) {
+    $html .= l($value, 'listing-status-operator/' . $bid . '/' . $key . '/nojs', array(
+      'attributes' => array(
+        'class' => array(
+          'use-ajax',
+          $value
+        ),
+      ),
+    ));
+
+  }
+
+  $html .= ' </div>';
+  heydesk_ctools_popup_style();
+  //  $output = theme('heydesk_booking_overview', array('booking' => $booking));
+  $command[] = ctools_modal_command_display('html', $html);
+
+  print ajax_render($command);
+  // print $output;
+  drupal_exit();
+}
+
+function heydesk_booking_status_overwrite_callback($bid, $status, $js = NULL) {
+  $array_status = array(
+    0 => 'rejected',
+    1 => 'pending',
+    2 => 'approved',
+  );
+  $listing = heydesk_listing_load($bid);
+  $bayer = user_load($listing->uid);
+  $seller = user_load($listing->pid);
+
+  $proposal = node_load($listing->date);
+  $proposalCityTaxId = $proposal->field_sities[LANGUAGE_NONE][0]['tid'];
+  $sellerName = $seller->field_first_name[LANGUAGE_NONE][0]['value'];
+
+
+  $vars = array(
+    'UserName' => $bayer->field_first_name[LANGUAGE_NONE][0]['value'],
+    'userId' => $bayer->uid,
+    'listingName' => $proposal->title,
+    'listingPrice' => $listing->price,
+    'listingCityId' => $proposalCityTaxId,
+    'sellerId' => $seller->uid,
+    'sellerName' => $sellerName,
+  );
+
+
+  $listing->status = $status;
+
+  $listing = entity_save('heydesk_listing', $listing);
+  if ($status == 2) {
+
+    drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_booking_confirmation_positive', $bayer->mail, language_default(), $vars, variable_get('site_mail', ''));
+    drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_booking_confirmation_positive_self', $seller->mail, language_default(), $vars, variable_get('site_mail', ''));
+
+  }
+  else {
+    $desc_2 = array(
+      'payment' => t('Return money'),
+      'description' => t('Workspace Rental'),
+    );
+    drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_booking_confirmation_negative', $bayer->mail, language_default(), $vars, variable_get('site_mail', ''));
+    $order_2 = heydesk_peyment_factoring(9999999, $listing->price, $bayer->uid, $desc_2);
+
+
+  }
+
+  if ($listing) {
+    $link = '<div class="' . $array_status[$status] . '">' . ucfirst($array_status[$status]) . '</div>';
+    //    $link = l('<div class="' . $array_status[$status] . '">' . ucfirst($array_status[$status]) . '</div>', 'listing-status/' . $bid . '/nojs', array(
+    //      'attributes' => array(
+    //        'class' => array(
+    //          'use-ajax',
+    //          'ctools-use-modal',
+    //          'ctools-modal-first-popup-style',
+    //          'ctools-use-modal-processed'
+    //        )
+    //      ),
+    //      'html' => TRUE,
+    //    ));
+    heydesk_ctools_popup_style();
+
+    $commands = array();
+    $commands[] = ajax_command_html('#status-' . $bid, $link);
+    $commands[] = ctools_modal_command_dismiss();
+
+    return array('#type' => 'ajax', '#commands' => $commands);
+
+
+  }
+
+
+}
+
+function heydesk_listing_access($op, $entity, $account = NULL, $entity_type = 'heydesk_listing') {
+  return user_access('heydesk user');
+}
+
+function heydesk_listing_load($id) {
+  $result = entity_load('heydesk_listing', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+function heydesk_listing_overview_list() {
+  $query = db_select('heydesk_listing', 'hl')
+    ->fields('hl', array('id'))
+    ->condition('hl.pid', arg(1))
+    ->execute()
+    ->fetchAll();
+  $listings = array();
+  foreach ($query as $overview) {
+    $listings[] = heydesk_listing_load($overview->id);
+  }
+
+  dpm($query);
+
+  $output = '<h1>' . t('Listings Overview') . '</h1>';
+
+  $header = array(
+    t('Rental Period'),
+    t('Tenent'),
+    t('Workspace'),
+    t('Price'),
+    t('Status'),
+    t('')
+  );
+  $rows = array();
+  foreach ($listings as $listing) {
+    $rental_period = '<div>' . date('d, M - H:i', $listing->date_from) . '</div>';
+    $rental_period .= '<div>' . date('d, M - H:i', $listing->date_to) . '</div>';
+    $user_entity = user_load($listing->uid);
+
+
+    $user_pic = theme('image_style', array(
+      'path' => file_uri_target($user_entity->picture->uri),
+      'style_name' => 'user_40x40'
+    ));
+    $user_listing = '<div class="pics">' . $user_pic . '</div>';
+    $user_listing .= '<div class="name">' . (isset($user_entity->field_surname[LANGUAGE_NONE][0]['value']) ? $user_entity->field_surname[LANGUAGE_NONE][0]['value'] : '') . ' ' . (isset($user_entity->field_first_name[LANGUAGE_NONE][0]['value']) ? $user_entity->field_first_name[LANGUAGE_NONE][0]['value'] : '');
+    $user_listing .= '<br />' . _heydesk_stars_output(isset($user_entity->field_stars[LANGUAGE_NONE][0]['value']) ? $user_entity->field_stars[LANGUAGE_NONE][0]['value'] : 0) . '</div>';
+
+    $proposal_entity = node_load($listing->date);
+
+    $proposal = '<i class="fa fa-map-marker" aria-hidden="true"></i>';
+    $proposal .= isset($proposal_entity->field_address[LANGUAGE_NONE][0]['value']) ? $proposal_entity->field_address[LANGUAGE_NONE][0]['value'] : '';
+    $proposal .= ', <br />';
+    if (isset($proposal_entity->field_sities[LANGUAGE_NONE][0]['tid'])) {
+      $proposal .= _term_name($proposal_entity->field_sities[LANGUAGE_NONE][0]['tid']);
+    }
+    if (isset($proposal_entity->field_country[LANGUAGE_NONE][0]['tid'])) {
+      $proposal .= isset($proposal_entity->field_sities[LANGUAGE_NONE][0]['tid']) ? ', ' : '';
+      $proposal .= _term_name($proposal_entity->field_country[LANGUAGE_NONE][0]['tid']);
+    }
+    switch ($listing->status) {
+      case 0:
+        $status = '<div class="rejected">' . t('Rejected') . '</div>';
+        break;
+      case 1:
+        $status = '<div class="pending">' . t('Pending') . '</div>';
+        break;
+      case 2:
+        $status = '<div class="approved">' . t('Approved') . '</div>';
+        break;
+      case 3:
+        $status = '<div class="cancelled">' . t('Cancelled') . '</div>';
+        break;
+    }
+    if ($listing->status != 1) {
+      $status_link = $status;
+
+    }
+    else {
+      $status_link = l($status, 'listing-status/' . $listing->id . '/nojs', array(
+        'attributes' => array(
+          'class' => array(
+            'ctools-use-modal',
+            'ctools-modal-first-popup-style'
+          )
+        ),
+        'html' => TRUE,
+      ));
+    }
+    heydesk_ctools_popup_style();
+
+
+    $actions = array(
+      l('<span> </span>', 'listing/' . $listing->id . '/nojs', array(
+        'html' => TRUE,
+        'attributes' => array(
+          'class' => array(
+            'glass',
+            'ctools-use-modal',
+            'ctools-modal-first-popup-style'
+          )
+        )
+      )),
+      l('<span> </span>', 'listing-print/' . $listing->id . '/pdf', array(
+        'html' => TRUE,
+        'attributes' => array(
+          'class' => array(
+            'print',
+          ),
+          'target' => '_blank'
+        )
+      )),
+      l('<span> </span>', '/edit', array(
+        'html' => TRUE,
+        'attributes' => array(
+          'class' => array('arrow')
+        )
+      )),
+
+    );
+    $rows[] = array(
+      $rental_period,
+      $user_listing,
+      $proposal,
+      '$ ' . $listing->price . ',-',
+      '<div id="status-' . $listing->id . '">' . $status_link . '</div>',
+      implode(' ', $actions)
+    );
+  }
+
+  $output .= theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'attributes' => array('class' => array('listing-overview', 'table'))
+  ));
+
+  return $output;
+
+}
+
+function heydesk_booking_overview_list($user) {
+
+  $query = db_select('heydesk_listing', 'hl')->fields('hl');
+  $query->condition('hl.uid', arg(1));
+  //        $query->condition('hl.status', 1);
+
+  $bookings = $query->execute()->fetchAll();
+  //    dpm($bookings);
+
+
+  $output = '<h1>' . t('Booking Overview') . '</h1>';
+  if (!isset($bookings)) {
+    $output .= '<h4>' . t('You have no Booking Overview.') . '</h4>';
+  }
+  else {
+
+
+    foreach ($bookings as $booking) {
+      $item_color = $booking->status == 0 ? 'past' : 'active';
+
+      $output .= '<div class="status-item-' . $item_color . '">';
+
+
+      $actions = array(
+        l('<span> </span>', 'booking/' . $booking->id . '/nojs', array(
+          'html' => TRUE,
+          'attributes' => array(
+            'class' => array(
+              'glass',
+              'ctools-use-modal',
+              'ctools-modal-first-popup-style'
+            )
+          )
+        )),
+        l('<span></span>', 'booking-print/' . $booking->id . '/pdf', array(
+          'html' => TRUE,
+          'attributes' => array(
+            'class' => array(
+              'print',
+            ),
+            'target' => '_blank'
+          )
+        )),
+        l('<span></span>', '/edit', array(
+          'attributes' => array('class' => array('arrow')),
+          'html' => TRUE,
+        )),
+
+      );
+      heydesk_ctools_popup_style();
+      $proverka = db_select('node', 'n')
+        ->fields('n', array('nid'))
+        ->condition('n.nid', $booking->date)
+        ->execute()
+        ->fetchField();
+      //            dpm($proverka);
+
+      if (is_numeric($proverka)) {
+        $node = node_load($booking->date);
+
+        $ima = field_get_items('node', $node, 'field_photos');
+        $image = field_view_value('node', $node, 'field_photos', $ima[0], array(
+          'type' => 'image',
+          'settings' => array(
+            'image_style' => 'proposal_200x170', //place your image style here
+            // 'image_link' => 'content',
+          ),
+        ));
+        $image = render($image);
+        $node_title = isset($node->title) ? $node->title : '';
+        $node_address = isset($node) ? $node->field_address[LANGUAGE_NONE][0]['value'] : '';
+
+        $node_city = _term_name($node->field_sities[LANGUAGE_NONE][0]['tid']);
+        $node_country = _term_name($node->field_country[LANGUAGE_NONE][0]['tid']);
+        $node_price = isset($node->field_price[LANGUAGE_NONE][0]['value']) ? $node->field_price[LANGUAGE_NONE][0]['value'] : 0;
+        $node_rental_period = $node->field_minimum_rental_period[LANGUAGE_NONE][0]['value'];
+        $link_class = '';
+        $node_reting = heydesk_stars_rating_list($node->nid, $booking->id);
+
+
+        $delete_link = l(t('Cancel Booking'), '/delete/' . $booking->id . '/heydesk_listing/nojs', array(
+          'attributes' => array(
+            'class' => array(
+              'ctools-use-modal',
+              'ctools-modal-small-popup-style',
+            ),
+            'id' => 'remove-button-' . $node->nid,
+
+          ),
+        ));
+        $comment_link = l(t('Add Review'), '/comments/add/' . $node->nid . '/nojs', array(
+          'attributes' => array(
+            'class' => array(
+              'ctools-use-modal',
+              'ctools-modal-modal-popup-medium',
+              $link_class
+
+            ),
+          ),
+        ));
+        $button_link = $booking->status == 1 ? $delete_link : $comment_link;
+        $button_link = '<div class="button">' . $button_link . '</div>';
+        $hidden_classs = '';
+
+      }
+      else {
+        $params = array(
+          'style_name' => 'thumbnail',
+          'path' => drupal_get_path('theme', 'heydesk') . '/images/no-images.jpg',
+          'alt' => t('No Image'),
+          'title' => t('No Image'),
+          'attributes' => array('class' => array('image')),
+          'getsize' => FALSE,
+        );
+        $image = theme('image_style', $params);
+
+        $node_title = t('The proposal is missing or hidden');
+        $node_address = '';
+
+        $node_city = '';
+        $node_country = '';
+        $node_price = '';
+        $node_rental_period = '';
+        $link_class = 'hidden';
+        $node_reting = '';
+        $button_link = '';
+        $hidden_classs = 'hidden';
+
+
+      }
+
+
+      //      theme('image_style', array(
+      //  dpm($image);
+      //      'path' => isset($node->field_photos[LANGUAGE_NONE][0]['uri']) ? file_uri_target($node->field_photos[LANGUAGE_NONE][0]['uri']) : '',
+      //      'style_name' => 'proposal_200x170'
+      //    ));
+
+      $output .= '<div class="inner_block_container ' . $hidden_classs . '">';
+      $output .= '<div class="row">';
+      $output .= '<div class="col-md-2">';
+      // $output .= '<i class="fa fa-trash-o" aria-hidden="true"></i>';
+      $output .= $image;
+      $output .= '</div>';
+      $output .= '<div class="col-md-7">';
+      $output .= '<h3>';
+      $output .= $node_title;
+      $output .= '</h3>';
+      $output .= '<div class="stars-rating-' . $booking->id . '">' . $node_reting . '</div>';
+      $output .= '<p></p><p class="point_adress">';
+      $output .= '<i class="fa fa-map-marker" aria-hidden="true"></i>';
+      $output .= $node_address;
+      $output .= ', ';
+      $output .= $node_city;
+      $output .= ', ';
+      $output .= $node_country;
+      $output .= '</p>';
+      $output .= '<p><b>' . t('Booking period :  ') . '</b>';
+      $output .= date('d, M - H:i', $booking->date_from);
+      $output .= ' > ';
+      $output .= date('d, M - H:i', $booking->date_to);
+      $output .= ' ( ' . _heydesk_coont_day($booking->date_from, $booking->date_to) . ' Days )';
+
+      $output .= ' ( Status: ' . _heydesk_booking_status($booking->status) . ' )';
+
+      $output .= '</p>';
+      $output .= '<p><b>';
+      $output .= t('Total Price : ');
+      $output .= '</b>';
+      $output .= $booking->price;
+      $output .= '</p>';
+      $output .= '</div>';
+      $output .= '<div class="col-md-3">';
+      $output .= '<div class="three_icons">';
+      $output .= implode(' ', $actions);
+      $output .= '</div>';
+      $output .= '<p class="price_per_day">from $' . $node_price . ' /' . $node_rental_period . '</p>';
+      heydesk_ctools_popup_style();
+
+
+      $output .= '';
+      $output .= $button_link;
+      $output .= '</div>';
+      $output .= '</div>';
+      $output .= '';
+      $output .= '</div>';
+      $output .= '</div>';
+      $output .= '';
+
+
+    }
+  }
+  $output .= '';
+  if (!$proverka) {
+    $output = '<h1>' . t('Booking Overview') . '</h1>';
+    $output .= '<h4>' . t('You have no Booking Overview.') . '</h4>';
+  }
+
+  return $output;
+}
+
+function _heydesk_booking_status($status) {
+  switch ($status) {
+    case 0:
+      $output = '<span class="rejected">' . t('Rejected') . '</span>';
+      break;
+    case 1:
+      $output = '<span class="pending">' . t('Pending') . '</span>';
+      break;
+    case 2:
+      $output = '<span class="approved">' . t('Approved') . '</span>';
+      break;
+
+
+  }
+  return $output;
+}
+
+function _heydesk_coont_day($from, $to) {
+  $coll = $to - $from;
+  $coll = $coll / (60 * 60 * 24);
+  return round($coll);
+}

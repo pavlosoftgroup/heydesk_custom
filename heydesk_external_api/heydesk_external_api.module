@@ -1,0 +1,660 @@
+<?php
+
+function heydesk_external_api_init() {
+  //  drupal_add_js('https://maps.googleapis.com/maps/api/js?key=AIzaSyD9A0o063dpoEHKF6kq6jflUcUOqBB_DpI&callback=initMap');
+
+  //  drupal_add_js(array('heydesk_external_api' => array('apiKey' => variable_get('heydesk_google_map_key', ''))), 'setting');
+
+
+}
+
+//module_load_include('inc', 'heydesk_external_api', 'includes/social_icon.block');
+
+/**
+ * Implements hook_menu().
+ */
+function heydesk_external_api_menu() {
+  $items['admin/structure/external-api'] = array(
+    'title' => t('External API'),
+    'description' => t('External API Setting. Enter key to connect external API.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_external_api_setting_form'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['share-popup/%/%ctools_js'] = array(
+    'title' => t('External API'),
+    'description' => t('Share Popup'),
+    'page callback' => 'heydesk_external_api_share_popup_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('heydesk user'),
+    //    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_form()
+ */
+function  heydesk_external_api_setting_form($form, $form_state) {
+  global $base_url;
+  $form['setting'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Enter key to connect external API')
+  );
+  $form['setting']['google_map'] = array(
+    '#title' => t('Google Map API Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Google Map API Key. ') . l(t('Google APIs'), 'https://console.developers.google.com/apis'),
+    '#default_value' => variable_get('heydesk_google_map_key', ''),
+  );
+  $form['setting']['gmail_callback'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Please, enter this url in field "Callback" in account integration Gmail API: ') . $base_url . '/oauth2',
+  );
+  $form['setting']['facebook'] = array(
+    '#title' => t('Facebook ID Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Facebook API Key. ') . l(t('Facebook Developers'), 'https://developers.facebook.com/'),
+    '#default_value' => variable_get('heydesk_facebook_key', ''),
+  );
+  $form['setting']['facebook_secret'] = array(
+    '#title' => t('Facebook Secret Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Facebook  Secret Key. ') . l(t('Facebook Developers'), 'https://developers.facebook.com/'),
+    '#default_value' => variable_get('heydesk_facebook_secret_key', ''),
+  );
+  $form['setting']['facebook_callback'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Please, enter this url in field "Domains" in account Facebook: ') . $base_url,
+  );
+  $form['setting']['linkedin'] = array(
+    '#title' => t('Linked In ID Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Linked In API Key. ') . l(t('Linked In Developers'), 'https://developer.linkedin.com/'),
+    '#default_value' => variable_get('heydesk_linkedin_key', ''),
+  );
+  $form['setting']['linkedin_secret'] = array(
+    '#title' => t('Linked In Secret Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Linked In Secret Key. ') . l(t('Linked In Developers'), 'https://developer.linkedin.com/'),
+    '#default_value' => variable_get('heydesk_linkedin_secret_key', ''),
+  );
+  $form['setting']['linkedin_callback'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Please, enter this url in field "Callback" in account Linked In: ') . $base_url . '/linkedin',
+  );
+  $form['setting']['nexmo'] = array(
+    '#title' => t('Nexmo ID Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Nexmo API Key. ') . l(t('Nexmo'), 'https://dashboard.nexmo.com/getting-started-guide/'),
+    '#default_value' => variable_get('heydesk_nexmo_key', ''),
+  );
+  $form['setting']['nexmo_secret'] = array(
+    '#title' => t('Nexmo Secret Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter Nexmo  Secret Key. ') . l(t('Nexmo'), 'https://dashboard.nexmo.com/getting-started-guide'),
+    '#default_value' => variable_get('heydesk_nexmo_secret_key', ''),
+  );
+  $form['setting']['quickpay'] = array(
+    '#title' => t('QuickPay Api Key'),
+    '#type' => 'textfield',
+    '#description' => t('Enter QuickPay Api Key. ') . l(t('QuickPay'), 'https://manage.quickpay.net/account/31215/settings/integration'),
+    '#default_value' => variable_get('heydesk_quickpay_key', ''),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit')
+  );
+  return $form;
+}
+
+/**
+ * Implement hook_form_submit()
+ */
+function heydesk_external_api_setting_form_submit($form, &$form_state) {
+
+  variable_set('heydesk_google_map_key', $form_state['values']['google_map']);
+  variable_set('heydesk_facebook_key', $form_state['values']['facebook']);
+  variable_set('heydesk_facebook_secret_key', $form_state['values']['facebook_secret']);
+  variable_set('heydesk_linkedin_key', $form_state['values']['linkedin']);
+  variable_set('heydesk_linkedin_secret_key', $form_state['values']['linkedin_secret']);
+  variable_set('heydesk_nexmo_key', $form_state['values']['nexmo']);
+  variable_set('heydesk_nexmo_secret_key', $form_state['values']['nexmo_secret']);
+  variable_set('heydesk_quickpay_key', $form_state['values']['quickpay']);
+}
+
+function google_map_proposal_view($conf, $block) {
+  drupal_add_js('https://maps.googleapis.com/maps/api/js?key=AIzaSyD9A0o063dpoEHKF6kq6jflUcUOqBB_DpI');
+
+  drupal_add_js(array('heydesk_external_api' => array('proposalAddress' => $conf)), 'setting');
+  drupal_add_js(array('heydesk_external_api' => array('idProposalBlockmap' => $block)), 'setting');
+  ///підключаємо наш javascript
+  //  $output = '<div id="' . $block . '" style="width:100%; height: 100%;"></div>';
+
+  //  return $output;
+
+
+}
+
+function google_map_block_render($conf, $block = 'contact_map') {
+  drupal_add_js('https://maps.googleapis.com/maps/api/js?key=' . variable_get('heydesk_google_map_key', ''));
+
+  //  $url = "https://maps.googleapis.com/maps/api/geocode/json";
+  ////  json_decode($request);
+  //  $data = array(
+  //    'address' => $conf,
+  //    'key' => 'AIzaSyDZZcf0g0uqgMFIcD17tGFhhUQ7nJaCVgY',
+  //  );
+  //  $options = array(
+  //    'method' => 'GET',
+  //    'data' => $data,
+  //    'headers' => array(),);
+  //
+  ////  $request = drupal_http_request($url, $options);
+  // // $request = 'https://maps.googleapis.com/maps/api/geocode/json?address=1600+Amphitheatre+Parkway,+Mountain+View,+CA&key=AIzaSyD9A0o063dpoEHKF6kq6jflUcUOqBB_DpI';
+  //  json_decode($request);
+  //dpm($request);
+  drupal_add_js(array('heydesk_external_api' => array('placeToShow' => $conf)), 'setting');
+  drupal_add_js(array('heydesk_external_api' => array('idBlockMmap' => $block)), 'setting');
+  //підключаємо наш javascript
+  drupal_add_js(drupal_get_path('module', 'heydesk_external_api') . '/js/init-map.js');
+
+  //  drupal_add_js(drupal_get_path('module', 'heydesk_external_api') . '/js/init-map.js');
+  //передаємо змінну місця розташування з форми в наш javascript модуля
+  //  $block = new stdClass();
+  //  $block->title = t('Find Us');
+  //  //підключаємо темізацію для контенту нашого блоку, яку опишемо у файлі .module в hook_theme()
+  //  $block->content = theme('map_content_theme', array(
+  //    'place' => $conf['place']
+  //  ));
+
+  return '<div id="contact_map" style="height: 300px; width: 100%;"></div>';
+
+
+}
+
+/**
+ * Implement hook_theme
+ * @return array
+ */
+function map_content_theme() {
+  $theme = array();
+  //сторення теми
+  $theme['map_content_theme'] = array(
+    //передаємо змінну в темплейт
+    'variables' => array(
+      'place' => NULL,
+    ),
+    'template' => 'block-content-map',
+    'path' => drupal_get_path('module', 'heydesk_external_api') . '/templates'
+  );
+  return $theme;
+}
+
+function heydesk_facebook_validator($form, &$form_state) {
+  require_once(drupal_get_path('module', 'heydesk_user') . '/facebook/vendor/autoload.php');
+
+
+  $fb = new Facebook\Facebook([
+    'app_id' => '1799194517014026}',
+    'app_secret' => 'f6438870b16fb05470f73653d8cb156e',
+    'default_graph_version' => 'v2.8',
+  ]);
+
+  $fb->setDefaultAccessToken('user-access-token');
+
+  /**
+   * Generate some requests and then send them in a batch request.
+   */
+
+  // Get the name of the logged in user
+  $requestUserName = $fb->request('GET', '/me?fields=id,name');
+
+  // Get user likes
+  $requestUserLikes = $fb->request('GET', '/me/likes?fields=id,name&amp;limit=1');
+
+  // Get user events
+  $requestUserEvents = $fb->request('GET', '/me/events?fields=id,name&amp;limit=2');
+
+  // Post a status update with reference to the user's name
+  $message = 'My name is {result=user-profile:$.name}.' . "\n\n";
+  $message .= 'I like this page: {result=user-likes:$.data.0.name}.' . "\n\n";
+  $message .= 'My next 2 events are {result=user-events:$.data.*.name}.';
+  $statusUpdate = ['message' => $message];
+  $requestPostToFeed = $fb->request('POST', '/me/feed', $statusUpdate);
+
+  // Get user photos
+  $requestUserPhotos = $fb->request('GET', '/me/photos?fields=id,source,name&amp;limit=2');
+
+  $batch = [
+    'user-profile' => $requestUserName,
+    'user-likes' => $requestUserLikes,
+    'user-events' => $requestUserEvents,
+    'post-to-feed' => $requestPostToFeed,
+    'user-photos' => $requestUserPhotos,
+  ];
+
+  $output = '<h1>Make a batch request</h1>' . "\n\n";
+
+  try {
+    $responses = $fb->sendBatchRequest($batch);
+  } catch (Facebook\Exceptions\FacebookResponseException $e) {
+    // When Graph returns an error
+    $output .= 'Graph returned an error: ' . $e->getMessage();
+    exit;
+  } catch (Facebook\Exceptions\FacebookSDKException $e) {
+    // When validation fails or other local issues
+    $output .= 'Facebook SDK returned an error: ' . $e->getMessage();
+    exit;
+  }
+
+  foreach ($responses as $key => $response) {
+    if ($response->isError()) {
+      $e = $response->getThrownException();
+      $output .= '<p>Error! Facebook SDK Said: ' . $e->getMessage() . "\n\n";
+      $output .= '<p>Graph Said: ' . "\n\n";
+      var_dump($e->getResponse());
+    }
+    else {
+      $output .= "<p>(" . $key . ") HTTP status code: " . $response->getHttpStatusCode() . "<br />\n";
+      $output .= "Response: " . $response->getBody() . "</p>\n\n";
+      $output .= "<hr />\n\n";
+    }
+  }
+  return $output;
+
+}
+
+function heydesk_facebook_validator_page_callback($user) {
+  require_once(drupal_get_path('module', 'heydesk_user') . '/facebook/vendor/autoload.php');
+
+
+  $fb = new Facebook\Facebook([
+    'app_id' => '1799194517014026}',
+    'app_secret' => 'f6438870b16fb05470f73653d8cb156e',
+    'default_graph_version' => 'v2.8',
+  ]);
+
+  $helper = $fb->getRedirectLoginHelper();
+
+  try {
+    $accessToken = $helper->getAccessToken();
+  } catch (Facebook\Exceptions\FacebookResponseException $e) {
+    // When Graph returns an error
+    echo 'Graph returned an error: ' . $e->getMessage();
+    exit;
+  } catch (Facebook\Exceptions\FacebookSDKException $e) {
+    // When validation fails or other local issues
+    echo 'Facebook SDK returned an error: ' . $e->getMessage();
+    exit;
+  }
+
+  if (!isset($accessToken)) {
+    if ($helper->getError()) {
+      header('HTTP/1.0 401 Unauthorized');
+      echo "Error: " . $helper->getError() . "\n";
+      echo "Error Code: " . $helper->getErrorCode() . "\n";
+      echo "Error Reason: " . $helper->getErrorReason() . "\n";
+      echo "Error Description: " . $helper->getErrorDescription() . "\n";
+    }
+    else {
+      header('HTTP/1.0 400 Bad Request');
+      echo 'Bad request';
+    }
+    exit;
+  }
+
+  // Logged in
+  echo '<h3>Access Token</h3>';
+  var_dump($accessToken->getValue());
+
+  // The OAuth 2.0 client handler helps us manage access tokens
+  $oAuth2Client = $fb->getOAuth2Client();
+
+  // Get the access token metadata from /debug_token
+  $tokenMetadata = $oAuth2Client->debugToken($accessToken);
+  echo '<h3>Metadata</h3>';
+  var_dump($tokenMetadata);
+
+  $tokenMetadata->validateAppId('1799194517014026');
+  $tokenMetadata->validateExpiration();
+
+  if (!$accessToken->isLongLived()) {
+    // Exchanges a short-lived access token for a long-lived one
+    try {
+      $accessToken = $oAuth2Client->getLongLivedAccessToken($accessToken);
+    } catch (Facebook\Exceptions\FacebookSDKException $e) {
+      echo "<p>Error getting long-lived access token: " . $helper->getMessage() . "</p>\n\n";
+      exit;
+    }
+
+    echo '<h3>Long-lived</h3>';
+    var_dump($accessToken->getValue());
+  }
+
+  $_SESSION['fb_access_token'] = (string) $accessToken;
+
+
+}
+
+function heydesk_facebook_share_callback($js = NULL, $node) {
+  $facebook_link = drupal_http_request('https://www.facebook.com/dialog/share?app_id=447866848934386&display=popup&href=http%3A%2F%2Fheydesk.it-dev-lab.com%2Fnode%2F' . $node->nid);
+  if (!$js) {
+    return $facebook_link;
+  }
+
+
+  ctools_include('modal');
+  ctools_include('ajax');
+
+  ctools_modal_add_js();
+
+
+  $commands = array();
+
+  $output = ctools_modal_command_display('Share' . $facebook_link);
+  //  $commands[] = ctools_modal_command_display('Share' .$facebook_link);
+
+  if (!empty($form_state['executed'])) {
+    $commands[] = ctools_ajax_command_redirect('node/' . $node->nid);
+  }
+
+  //  return array('#type' => 'ajax', '#commands' => $commands);
+  //  print ajax_render($output);
+  //
+  //	drupal_exit();
+  return $facebook_link;
+}
+
+function heydesk_linkedin_login_callback() {
+  global $base_url;
+
+  $parametr = drupal_get_query_parameters();
+//  dpm($parametr);
+  if(isset($parametr['error'])) {
+    drupal_goto($base_url);
+  }
+  $code = $parametr['code'];
+  $data = 'grant_type=authorization_code';
+  $data .= '&code=' . $code;
+  $data .= '&redirect_uri=' . $base_url . '%2Flinkedin';
+  $data .= '&client_id=' . variable_get('heydesk_linkedin_key', '');
+  $data .= '&client_secret=' . variable_get('heydesk_linkedin_secret_key', '');
+
+  $options = array(
+    'method' => 'POST',
+    'data' => $data,
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+  );
+  $result = drupal_http_request('https://www.linkedin.com/oauth/v2/accessToken', $options);
+
+  $token = drupal_json_decode($result->data);
+  $token = $token['access_token'];
+  //$data;
+
+  $get_url = drupal_http_request('https://api.linkedin.com/v1/people/~:(id,email-address,first-name,last-name)?oauth2_access_token=' . $token . '&format=json');
+  //  dpm($get_url);
+//    dpm(drupal_json_decode($get_url->data));
+  $user_data = drupal_json_decode($get_url->data);
+//  var_dump($user_data);
+//  exit;
+
+  $emails = db_select('users', 'u')
+    ->fields('u', array('uid'))
+    ->condition('u.mail', $user_data['emailAddress'])
+    ->execute()
+    ->fetchCol();
+  if ($emails) {
+    $user = user_load($emails[0]);
+
+
+    if (isset($user->field_linked_in_id[LANGUAGE_NONE][0])) {
+      $user->field_first_name[LANGUAGE_NONE][0]['value'] = $user_data['firstName'];
+      $user->field_surname[LANGUAGE_NONE][0]['value'] = $user_data['lastName'];
+//      $user->field_linked_in_id[LANGUAGE_NONE][0]['value'] = $user_data['id'];
+      $user = user_save($user);
+
+      $username = $user_data['emailAddress'];
+      $password = 'HEYDESK_'.$user_data['id'];
+
+      $account = heydesk_autoficate_user($username, $password);
+      if ($account) {
+        return TRUE;
+      }
+      else {
+        $form_state['redirect'] = 'error-login';
+      }
+
+    }
+    else {
+
+      $login_link = l(t('Login'), 'user', array('attributes' => array('class' => array(''))));
+      $output = ' <div class="linkedin_callback">';
+      $output .= '<h1>';
+      $output .= t('Your mail is already registered on the site.');
+      $output .= '</h1>';
+      $output .= '<p>';
+      $output .= t('Use the sign in form.');
+      $output .= '</p>';
+      $output .= '<div class="button">';
+      $output .= $login_link;
+      $output .= '</div>';
+      $output .= '</div>';
+
+      return $output;
+    }
+
+  }
+  else {
+
+    $values = array(
+      'name' => $user_data['emailAddress'],
+      'mail' => $user_data['emailAddress'],
+      'pass' => 'HEYDESK_' . $user_data['id'],
+      'field_linked_in_id' => array(LANGUAGE_NONE => array(array('value' => $user_data['id']))),
+      'field_first_name' => array(LANGUAGE_NONE => array(array('value' => $user_data['firstName']))),
+      'field_surname' => array(LANGUAGE_NONE => array(array('value' => $user_data['lastName']))),
+      'status' => 1,
+      'init' => $user_data['emailAddress'],
+      'roles' => array(
+        DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+      ),
+    );
+
+    $account = user_save('', $values);
+    $account->password = $values['pass'];
+    $form_state = array();
+    $form_state['uid'] = $account->uid;
+    user_login_submit(array(), $form_state);
+    drupal_goto("user/" . $account->uid);
+
+
+  }
+
+
+  $output = 'ERROR!!!';
+  return $output;
+}
+
+function heydesk_gmail_callback() {
+  global $base_url;
+
+  $parametr = drupal_get_query_parameters();
+  $code = $parametr['code'];
+  $data = 'grant_type=authorization_code';
+  $data .= '&code=' . $code;
+  $data .= '&redirect_uri=' . $base_url . '%2Foauth2';
+  $data .= '&client_id=' . '846515019155-vea9c05gm9s1mlhg9dqjikhogke3e10c.apps.googleusercontent.com';
+  $data .= '&client_secret=' . 'm8mwozORM_x56t1InLKoFHw_';
+
+  $options = array(
+    'method' => 'POST',
+    'data' => $data,
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+  );
+  $result = drupal_http_request('https://accounts.google.com/o/oauth2/token', $options);
+  $token = drupal_json_decode($result->data);
+  $token = $token['access_token'];
+  $max_results = 25;
+  $get_url = drupal_http_request('https://www.google.com/m8/feeds/contacts/default/full?max-results=' . $max_results . '&alt=json&v=3.0&oauth_token=' . $token);
+  $results = drupal_json_decode($get_url->data);
+  $results = $results['feed']['entry'];
+  //  dpm($results);
+  $options = '<h1>' . t('Invite Friends') . '</h1>';
+  $options .= '<div class="invatite">';
+
+
+  foreach ($results as $key => $result) {
+
+
+    $suffix = '<div>';
+    $suffix .= '<div class="send_wrapper">';
+    $suffix .= '<div class="send_message">';
+    $suffix .= '<p class="info-invite">';
+    $suffix .= isset($result['title']['$t']) ? $result['title']['$t'] : '';
+    $suffix .= ' </p>';
+    $suffix .= '<p class="mail">';
+    $suffix .= $result['gd$email'][0]['address'];
+    $suffix .= '</p>';
+    $suffix .= '</div>';
+    $suffix .= '</div>';
+    $suffix .= l(t('Invite'), 'invite/send/' . $result['gd$email'][0]['address'] . '/' . $key . '/nojs', array(
+      'attributes' => array(
+        'class' => array(
+          'button_link',
+          'use-ajax',
+          'user_key_' . $key
+        )
+      )
+    ));
+    $suffix .= '<div  class="luboy">';
+
+    $suffix .= '<div id="key-' . $key . '">';
+    $suffix .= '</div>';
+    $suffix .= '</div>';
+    $suffix .= '</div>';
+
+
+    $options .= $suffix;
+  }
+  $options .= '</div>';
+
+  return $options;
+}
+
+
+function heydesk_gmail_invite_form_submit($form, &$form_state) {
+  global $base_url;
+  global $user;
+  $invite_id = 100000 + (int) $user->uid;
+  $invite_link = $base_url . '/invite/' . $invite_id;
+  foreach ($form_state['values']['input']['invite'] as $mail) {
+
+    drupal_mail('system', 'mail', $mail, language_default(), array(
+      'context' => array(
+        'subject' => t('Invite Heydesk'),
+        'message' => t('Something like join this platform that I am using @link', array('@link' => $invite_link)),
+      )
+    ));
+
+    //    dpm($send);
+  }
+
+  $form_state['redirect'] = 'node/106';
+  drupal_goto('node/106');
+
+
+}
+
+function heydesk_invite_ajax_callback($mail, $key, $nojs = NULL) {
+  global $base_url;
+  global $user;
+  $invite_id = 100000 + (int) $user->uid;
+  $invite_link = $base_url . '/invite/' . $invite_id;
+
+  drupal_mail('system', 'mail', $mail, language_default(), array(
+    'context' => array(
+      'subject' => t('Invite Heydesk'),
+      'message' => t('Something like join this platform that I am using @link', array('@link' => $invite_link)),
+    )
+  ));
+
+  //  $commands[] = ajax_command_insert('#key-' . $key, t('OK'));
+  $commands[] = ajax_command_invoke('.user_key_' . $key, 'addClass', array('disabled'));
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+
+}
+
+function heydesk_external_api_share_popup_callback($nid, $nojs = NULL) {
+  global $base_url;
+
+  $node = node_load($nid);
+  $node_url = $base_url . '/node/' . $nid;
+  $node_image_url = isset($node->field_photos[LANGUAGE_NONE][0]['uri']) ? file_create_url($node->field_photos[LANGUAGE_NONE][0]['uri']) : '';
+  $node_description = isset($node->field_location_description[LANGUAGE_NONE][0]['value']) ? $node->field_location_description[LANGUAGE_NONE][0]['value'] : '';
+
+  $lincedin_link = l('Linked In', 'https://www.linkedin.com/shareArticle?mini=true&url=' . $node_url . '&title=' . $node->title . '&source=Heydesk', array(
+    'attributes' => array(
+      'target' => 'blank',
+
+    ),
+  ));
+  $facebook_linc = l(t('Facebook'), 'https://www.facebook.com/sharer/sharer.php?u=' . $node_url . '&picture=' . $node_image_url, array(
+    'attributes' => array(
+      'target' => 'blank',
+
+    ),
+  ));
+  $output = '<div class="middle ">';
+  $output .= '<div class="share-fbook" id="facebook">' . $facebook_linc . '</div>';
+  $output .= '<div class="share-twit"><a target="_blank" href="https://twitter.com/share?url=' . $base_url . '&text=Something like join this platform that I am using&hashtags=heydeask">Twitter</a></div>';
+  $output .= '<div class="share-linkdin">' . $lincedin_link . '</div>';
+  $output .= '</div>';
+  heydesk_ctools_popup_style();
+
+
+  $outputs = array();
+  $outputs[] = ctools_modal_command_display(t('Share'), $output);
+
+  print ajax_render($outputs);
+  drupal_exit();
+
+
+}
+function heydesk_external_api_sms_response($code, $response){
+  $url = 'https://api.nexmo.com/verify/check/json?' . http_build_query([
+      'api_key' => variable_get('heydesk_nexmo_key', ''),
+      'api_secret' => variable_get('heydesk_nexmo_secret_key', ''),
+      'request_id' =>$response,
+      'code' => $code
+    ]);
+
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+  $response = curl_exec($ch);
+  $sms_status = json_decode($response);
+  return $sms_status->status;
+
+
+
+}
+function heydesk_external_api_sms_callback($phone_number){
+
+  $url = 'https://api.nexmo.com/verify/json?' . http_build_query([
+      'api_key' => variable_get('heydesk_nexmo_key', ''),
+      'api_secret' => variable_get('heydesk_nexmo_secret_key', ''),
+      'number' => $phone_number,
+      'brand' => 'Heydesk'
+    ]);
+
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+  $response = curl_exec($ch);
+  $json_array = json_decode($response);
+  return  $json_array->request_id;
+
+}

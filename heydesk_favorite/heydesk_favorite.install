@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_favorite_schema() {
+  $schema['heydesk_favorite'] = array(
+    'description' => t('Table for favoriteg'),
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'size' => 'normal',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+      ),
+        'uid' => array(
+          'type' => 'int',
+          'length' => 8,
+          'not null' => TRUE,
+          'description' => t('User ID of tenent')
+        ),
+        'pid' => array(
+          'type' => 'int',
+          'length' => 8,
+          'not null' => TRUE,
+          'description' => t('ID proposal')
+        ),
+        'date' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'description' => t('adding date')
+        ),
+      ),
+      'indexes' => array(
+        'id' => array('id')
+      ),
+      'primary key' => array('id'),
+    
+  );
+  return $schema;
+}

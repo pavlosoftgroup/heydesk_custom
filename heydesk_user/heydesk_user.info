@@ -1,0 +1,8 @@
+name = Heydesk User Profile
+description = Realisation User Profile Page
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_user.module
+
+dependencies[] = heydesk_custom_function
+;files[] = heydesk_user.install

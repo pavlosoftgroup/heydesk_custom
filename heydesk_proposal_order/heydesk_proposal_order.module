@@ -1,0 +1,1219 @@
+<?php
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/QuickPay.php');
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Client.php');
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Request.php');
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Constants.php');
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Response.php');
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Exception.php');
+
+use QuickPay\QuickPay;
+
+//use QuickPay\API\Client;
+//use QuickPay\API\Request;
+define(LANGUAGE_NONE, 'und');
+function heydesk_proposal_order_init() {
+
+  //  drupal_add_js('https://payment.quickpay.net/embedded/v1/quickpay.js');
+  //  drupal_load('module', 'heydesk_custom_function');
+  //  drupal_load('module', 'heydesk_external_api');
+}
+
+/**
+ * Implements hook_menu().
+ */
+function heydesk_proposal_order_menu() {
+  $items['proposal-order/%proposal'] = array(
+    'title' => t('Proposal Order'),
+    'description' => t('External API Setting. Enter key to connect external API.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_proposal_order_form', 1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['phone-validate/%ctools_ja'] = array(
+    'title' => t('Mobile number validation'),
+    //      'description' => t(''),
+    'page callback' => 'heydesk_sms_validate_callback',
+    'page arguments' => array('heydesk_proposal_order_form', 1),
+    'access arguments' => array('heydesk user'),
+    'delivery callback' => 'ajax_deliver',
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['pay'] = array(
+    'title' => t('Proposal Order'),
+    'description' => t('External API Setting. Enter key to connect external API.'),
+    'page callback' => 'heydesk_paying_callback_respunse',
+    'page arguments' => array(),
+    'access arguments' => array('heydesk user'),
+    'delivery callback' => 'ajax_deliver',
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Realisation return proposal object to id
+ */
+function proposal_load($pid) {
+  $proposal = node_load($pid);
+  return $proposal;
+}
+
+function heydesk_sms_validate_callback($form, &$form_state) {
+
+
+  if (!$js) {
+    // Если JavaScript отключен — выводим содержимое без всплывающего окна.
+    return drupal_get_form('heydesk_sms_validate_form');
+  }
+  ctools_include('ajax');
+  ctools_include('modal');
+  // Устанавливаем начальные настройки формы.
+  $form_state = array(
+    'ajax' => TRUE,
+    'title' => t('Enter code'),
+  );
+  $output = ctools_modal_form_wrapper('heydesk_sms_validate_form', $form_state);
+  print ajax_render($output);
+  drupal_exit();
+}
+
+function heydesk_sms_validate_form($form, $form_state) {
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Book Workplace') . '</h1>',
+  );
+
+  $form['info_sms'] = array(
+    '#type' => 'fieldset',
+    //    '#prefix' => '<div  class="validate-form">',
+
+  );
+  $form['info_sms']['sms'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Enter your SMS code'),
+    '#size' => 4
+  );
+  $form['button'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['button']['back'] = array(
+    '#type' => 'submit',
+    '#value' => '',
+    '#attributes' => array('class' => array('back-button')),
+    '#submit' => array('_heydesk_form_back'),
+  );
+  $form['button']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+    '#submit' => array('heydesk_sms_validate_form_submit'),
+    '#attributes' => array('class' => array('button', 'button-submit')),
+    '#prefix' => '<div class="btn_border"><span>',
+    '#suffif' => '</span></div>',
+
+  );
+
+  return $form;
+}
+
+function heydesk_sms_validate_form_submit($form, &$form_state) {
+
+
+  $status = heydesk_external_api_sms_response($form_state['values']['sms'], $_SESSION['id_responre']);
+  dpm($status);
+
+  if ($status == 0) {
+    global $user;
+    $user = user_load($user->uid);
+    $user->field_mobile_varifity[LANGUAGE_NONE][0]['value'] = 1;
+    $user = user_save($user);
+
+    $_SESSION['form_step'] = 3;
+
+  }
+  else {
+
+    drupal_set_message(t('Invalide code'));
+  }
+
+
+}
+
+/**
+ *  Implements hook_form()
+ */
+
+function heydesk_proposal_order_form($form, $form_state, $pro_id) {
+  heydesk_ctools_popup_style();
+
+  global $user;
+  $user_fields = user_load($user->uid);
+  // dpm($form_state);
+  //  dpm($user_fields);
+  // $first_name = isset() ? : '';
+  switch ($_SESSION['form_step']) {
+    case  2 :
+      return heydesk_sms_validate_form($form, $form_state);
+      break;
+    case  3 :
+      return heydesk_proposal_order_form_page_two();
+      break;
+    case 4:
+      return heydesk_proposal_order_form_page_tree($form, $form_state, $pro_id);
+      break;
+    case 5:
+      return heydesk_proposal_order_form_page_foo();
+      break;
+  }
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Book Workplace') . '</h1>',
+  );
+
+  $form['step_num'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['step_num']['step_1'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 1') . '<div>' . t('Your info') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_2'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 2') . '<div>' . t('Options') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_3'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 3') . '<div>' . t('Validation') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_4'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 4') . '<div>' . t('Payment Method') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['info'] = array(
+    '#type' => 'fieldset',
+  );
+  $surname = isset($user_fields->field_surname[LANGUAGE_NONE][0]['value']) ? $user_fields->field_surname[LANGUAGE_NONE][0]['value'] : '';
+  $first_name = isset($user_fields->field_first_name[LANGUAGE_NONE][0]['value']) ? $user_fields->field_first_name[LANGUAGE_NONE][0]['value'] : '';
+  $form['info']['name'] = array(
+    '#type' => 'item',
+    '#title' => t('Name:'),
+    '#markup' => $surname . ' ' . $first_name,
+    //  '#prefix' => '<div class="row mail_stroke"><div class="col-md-5 col-sm-5 ">',
+    // '#suffix' => '</div>'
+  );
+  $form['info']['mail'] = array(
+    '#type' => 'item',
+    '#title' => t('E-mail:'),
+    '#markup' => $user->mail,
+    //  '#prefix' => '<div class="col-md-5 col-sm-5">',
+    //  '#suffix' => '</div></div>',
+  );
+  $form['info']['address'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Address :'),
+    '#description' => t('Enter your address'),
+    '#required' => TRUE,
+    '#default_value' => isset($user_fields->field_address[LANGUAGE_NONE][0]['value']) ? $user_fields->field_address[LANGUAGE_NONE][0]['value'] : '',
+    //   '#prefix' => '<div class="row adress-mobile_stroke"><div class="col-sm-5">',
+    //  '#suffix' => '</div>'
+
+  );
+  $form['info']['phone'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Mobile Number :'),
+
+  );
+  $form['info']['phone']['code'] = array(
+    '#type' => 'textfield',
+    //    '#description' => t('12345'),
+    '#required' => TRUE,
+    '#default_value' => isset($user_fields->field_phone_code[LANGUAGE_NONE][0]) ? $user_fields->field_phone_code[LANGUAGE_NONE][0]['value'] : '',
+    '#size' => 5,
+    // '#prefix' => '<div class="col-sm-5">',
+    // '#suffix' => '</div></div>',
+  );
+  $form['info']['phone']['mobile'] = array(
+    '#type' => 'textfield',
+    //    '#description' => t('1234567'),
+    '#required' => TRUE,
+    '#size' => 7,
+    '#default_value' => isset($user_fields->field_phone_number[LANGUAGE_NONE][0]) ? $user_fields->field_phone_number[LANGUAGE_NONE][0]['value'] : '',
+    // '#suffix' => '</div></div>',
+  );
+
+  $form['button'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['button']['back'] = array(
+    '#type' => 'submit',
+    '#value' => '',
+    '#attributes' => array('class' => array('back-button')),
+    '#submit' => array('_back_page'),
+  );
+  $form['button']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Next Step'),
+    '#attributes' => array(
+      'class' => array(
+        'button',
+        'button-submit',
+        //        'ctools-use-modal',
+        //        'ctools-modal-first-popup-style'
+      )
+    ),
+    // SMS Validation
+    //    '#ajax' => array(
+    //      'callback' => 'heydesk_sms_validate_callback',
+    //      'wrapper' => 'poll-choices',
+    //      'method' => 'replace',
+    //      'effect' => 'fade',
+    //    ),
+    //
+    /////////////
+    '#prefix' => '<div class="btn_border"><span>',
+    '#suffif' => '</span></div>',
+
+  );
+
+
+  return $form;
+}
+
+function _back_page($form, &$form_state) {
+  $form_state['redirect'] = 'node/' . arg(1);
+}
+
+function heydesk_proposal_order_form_submit($form, &$form_state) {
+  global $user;
+  $user = user_load($user->uid);
+  $user->field_address[LANGUAGE_NONE][0]['value'] = $form_state['values']['address'];
+  $user->field_phone_code[LANGUAGE_NONE][0]['value'] = $form_state['values']['code'];
+  $user->field_phone_number[LANGUAGE_NONE][0]['value'] = $form_state['values']['mobile'];
+  $user = user_save($user);
+  if ($user->field_mobile_varifity[LANGUAGE_NONE][0]['value'] != 1) {
+
+
+    $_SESSION['id_responre'] = heydesk_external_api_sms_callback($form_state['values']['code'] . $form_state['values']['mobile']);
+
+
+    $form_state['storage']['prime_step'] = $form_state['values'];
+    $_SESSION['form_step'] = 2;
+  }
+  else {
+    $form_state['storage']['prime_step'] = $form_state['values'];
+    $_SESSION['form_step'] = 3;
+
+  }
+  $_SESSION['form_value']['step_first'] = $form_state['values'];
+
+
+}
+
+function heydesk_proposal_order_form_page_two() {
+  global $user;
+  $user = user_load($user->uid);
+  //  dpm($user);
+  $nodes = node_load(arg(1));
+
+  if (isset($nodes->field_amenities_charge_[LANGUAGE_NONE])) {
+    foreach ($nodes->field_amenities_charge_[LANGUAGE_NONE] as $collection) {
+      $entity[] = field_collection_item_load($collection['value']);
+    }
+
+
+  }
+  else {
+    $entity[] = NULL;
+
+  }
+
+
+  //  $entity = ($entity_id);
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Book Workplace') . '</h1>',
+  );
+  $form['step_num'] = array(
+    '#type' => 'fieldset',
+    '#prefix' => '<div class="second-form"><div>',
+  );
+  $form['step_num']['step_1'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 1') . '<div>' . t('Your info') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_2'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 2') . '<div>' . t('Options') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_3'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 3') . '<div>' . t('Validation') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_4'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 4') . '<div>' . t('Payment Method') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['period'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Booking Period :'),
+    '#prefix' => '<div class="wrapper-form">',
+
+  );
+
+  $date_from = strtotime($_SESSION['date_from'] . ' ' . str_replace('_', ':', $_SESSION['time_from']));
+  $date_to = strtotime($_SESSION['date_to'] . ' ' . str_replace('_', ':', $_SESSION['time_to']));
+  //  dpm($_SESSION);
+  $form['period']['from'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="left-form-2"><div>' . $_SESSION['date_from'] . ' ' . str_replace('_', ':', $_SESSION['time_from']) . '</div>',
+  );
+  $form['period']['to'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div>' . $_SESSION['date_to'] . '  ' . str_replace('_', ':', $_SESSION['time_to']) . '</div>',
+  );
+  $form['period']['from_val'] = array(
+    '#type' => 'value',
+    '#value' => date('U', strtotime($_SESSION['date_from'] . str_replace('_', ':', $_SESSION['time_from']))),
+  );
+  $form['period']['to_val'] = array(
+    '#type' => 'value',
+    '#value' => date('U', strtotime($_SESSION['date_to'] . str_replace('_', ':', $_SESSION['time_to']))),
+  );
+  $form['period']['day'] = array(
+    '#markup' => '<div class="day"> ( ' . $_SESSION['col_day'] . t(' Days') . ' )</div></div>',
+    '#type' => 'markup',
+  );
+  $form['period']['price_val'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="price-form"> $ <span>' . _session_get('price') . '</span>,-</div>',
+  );
+  $form['period']['price_value'] = array(
+    '#value' => $_SESSION['price'],
+    '#type' => 'value'
+  );
+  //  dpm($entity);
+
+  if (isset($entity) && (is_object($entity[0]))) {
+
+    $form['extras'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Extras :'),
+      '#attributes' => array('class' => array('row')),
+      '#tree' => TRUE,
+    );
+    $prices = array();
+
+    foreach ($entity as $key => $amenties) {
+
+      //      dpm($amenties->field_price_amentyes[LANGUAGE_NONE][0]['value']);
+      //      if (isset($amenties)) {
+      $form['extras'][$key] = array(
+        '#type' => 'fieldset',
+      );
+      $description_amentyes = isset($amenties->field_description_amentyes[LANGUAGE_NONE][0]) ? '<span> (' . $amenties->field_description_amentyes[LANGUAGE_NONE][0]['value'] . ')</span>' : '';
+
+
+      $form['extras'][$key]['text'] = array(
+        '#type' => 'checkbox',
+        '#title' => $amenties->field__name_amentyes[LANGUAGE_NONE][0]['value'] . $description_amentyes,
+        '#attributes' => array(
+          'class' => array('left-checkbox'),
+          'id' => 'edit-extras-' . $key . '-text',
+        ),
+
+
+      );
+      $form['extras'][$key]['value'] = array(
+        //        '#prefix' => '',
+        '#markup' => '<span class="amenties_price">$ ' . $amenties->field_price_amentyes[LANGUAGE_NONE][0]['value'] . '<span>',
+        '#type' => 'markup',
+        // '#attributes' => array('class' => array('col-sm-7')),
+
+      );
+      $form['extras'][$key]['value_val'] = array(
+        '#value' => $amenties->field_price_amentyes[LANGUAGE_NONE][0]['value'],
+        '#type' => 'value',
+        // '#attributes' => array('class' => array('col-sm-7')),
+
+      );
+      $prices[$key] = $amenties->field_price_amentyes[LANGUAGE_NONE][0]['value'];
+
+
+    }
+    drupal_add_js(array('heydesk_proposal_order' => array('prices' => $prices)), 'setting');
+    drupal_add_js(array('heydesk_proposal_order' => array('val_price' => $_SESSION['price'])), 'setting');
+  }
+  $form['back'] = array(
+    '#type' => 'submit',
+    '#attributes' => array('class' => array('back-button')),
+    '#value' => '',
+    '#submit' => array('_heydesk_form_back'),
+  );
+
+  $form['chekbox_1'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Accept Heydesk terms and conditions'),
+    '#prefix' => '<div class="right-for-my">',
+
+  );
+
+  //  if (isset($user->field_id_ver[LANGUAGE_NONE][0]['value'])) {
+
+  $form['chekbox_2'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Share My Booking on Facebook'),
+
+  );
+  //  }
+
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Next Step'),
+    '#attributes' => array(
+      'class' => array('button', 'button-submit', 'fbshare'),
+    ),
+    '#submit' => array('heydesk_proposal_order_form_page_two_submit'),
+    '#validate' => array('heydesk_proposal_order_form_page_two_validate'),
+    '#prefix' => '<div class="btn_border"><span>',
+    '#suffix' => '</span></div></div></div></div></div>',
+  );
+  $form['#attached']['js'] = array(drupal_get_path('module', 'heydesk_proposal_order') . '/js/heydesk-proposal-order.js');
+
+  return $form;
+}
+
+function heydesk_proposal_order_form_page_two_validate($form, &$form_state) {
+  if ($form_state['values']['chekbox_1'] != 1) {
+
+    form_set_error('chekbox_1', t('confirm acceptance of the rules'));
+  }
+
+}
+
+function heydesk_proposal_order_form_page_two_submit($form, &$form_state) {
+  $extras = isset($form_state['values']['extras']) ? $form_state['values']['extras'] : FALSE;
+  if ($extras) {
+    foreach ($extras as $extra) {
+      if ($extra['text'] == 1) {
+        $_SESSION['price'] = $_SESSION['price'] + $extra['value_val'];
+      }
+    }
+
+  }
+
+  $_SESSION['form_step'] = 4;
+  $form_state['storage']['second_step'] = $form_state['values'];
+  $_SESSION['form_value']['step_second'] = $form_state['values'];
+  if (isset($form_state['values']['chekbox_2']) && ($form_state['values']['chekbox_2'] == 1)) {
+    //    $data = array(
+    //      'app_id' => '1681798165451624',
+    //      'display'=>'popup',
+    //      'href' =>'http%3A//heydesk.it-dev-lab.com/node/' . arg(1),
+    //    );
+    //    $result = drupal_http_request('https://www.facebook.com/sharer/sharer.php', array(
+    //      'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+    //      'method' => 'POST',
+    //      'data' => $data,
+    //    ));
+    //    $result = heydesk_facebook_share(node_load(arg(1)));
+    $form_state['redirect'] = 'https://www.facebook.com/dialog/share?app_id=447866848934386&display=popup&href=http%3A%2F%2Fheydesk.it-dev-lab.com%2Fnode%2F' . arg(1) . '&redirect_uri=http%3A%2F%2Fheydesk.it-dev-lab.com%2Fproposal-order%2F' . arg(1);
+
+  }//  $form_state['redirect'] = 'https://www.facebook.com/sharer/sharer.php?u=http%3A//heydesk.it-dev-lab.com/node/40';
+  //    'https://www.facebook.com/dialog/sharer.php?app_id=145634995501895&display=popup&href=http%3A//heydesk.it-dev-lab.com/node/' . arg(1) . '&redirect_uri=http%3A//heydesk.it-dev-lab.com/proposal-order/' . arg(1);
+
+}
+
+function heydesk_proposal_order_form_page_tree($form, &$form_state) {
+  global $user;
+  $user = user_load($user->uid);
+
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Book Workplace') . '</h1>',
+  );
+  $order_user = user_load($user->uid);
+  $form['#attributes']['enctype'] = 'multipart/form-data';
+
+
+  $form['step_num'] = array(
+    '#type' => 'fieldset',
+    '#prefix' => '<div  class="third-form">',
+
+  );
+  $form['step_num']['step_1'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 1') . '<div>' . t('Your info') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_2'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 2') . '<div>' . t('Options') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_3'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 3') . '<div>' . t('Validation') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_4'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 4') . '<div>' . t('Payment Method') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step inactive">',
+    '#suffix' => '</div>',
+  );
+  $form['top_text'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="step-top-text">' . t('Before you rent a workspace we need to validate your identity. Validation is made only once.
+
+If your information is not approved, your booking will be canceled.') . '</div>'
+  );
+  $form['user_id'] = array(
+    '#type' => 'value',
+    '#value' => $user->uid,
+    '#prefix' => '<div class="wrapper-form">',
+  );
+  $prop_id = arg(1);
+  //    dpm(_user_having_proposal_set($prop_id);
+  $form['user_proposal'] = array(
+    '#type' => 'value',
+    '#value' => _user_having_proposal_set($prop_id),
+  );
+  dpm(_user_having_proposal_set($prop_id));
+  $form['proposal'] = array(
+    '#type' => 'value',
+    '#value' => arg(1),
+  );
+  //  dpm($pro_id->nid);
+
+  $form['address'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Address :'),
+    '#default_value' => isset($order_user->field_address[LANGUAGE_NONE][0]['value']) ? $order_user->field_address[LANGUAGE_NONE][0]['value'] : '',
+    '#prefix' => '<div class="row">',
+    '#required' => TRUE,
+
+  );
+  $form['id_number'] = array(
+    '#type' => 'textfield',
+    '#title' => t('ID Number'),
+    '#default_value' => isset($order_user->field_id_number[LANGUAGE_NONE][0]['value']) ? $order_user->field_id_number[LANGUAGE_NONE][0]['value'] : '',
+    '#suffix' => '</div>',
+    '#required' => TRUE,
+
+
+  );
+  $form['zip_code'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Zip Code & City :'),
+    '#size' => 5,
+    '#default_value' => isset($order_user->field_zip_code[LANGUAGE_NONE][0]['value']) ? $order_user->field_zip_code[LANGUAGE_NONE][0]['value'] : '',
+    '#prefix' => '<div class="row"><div class="sity_address">',
+
+  );
+  $form['sity'] = array(
+    '#type' => 'textfield',
+    '#required' => TRUE,
+    '#default_value' => isset($order_user->field_sities[LANGUAGE_NONE][0]['tid']) ? _term_name($order_user->field_sities[LANGUAGE_NONE][0]['tid']) : '',
+    '#suffix' => '</div>',
+
+  );
+  $form['country'] = array(
+    '#type' => 'textfield',
+    '#title' => t('ID Number Issuing Country :'),
+    '#required' => TRUE,
+    '#default_value' => isset($order_user->field_country[LANGUAGE_NONE][0]['tid']) ? _term_name($order_user->field_country[LANGUAGE_NONE][0]['tid']) : '',
+    '#suffix' => '</div>',
+
+  );
+  $date_of_borth = isset($order_user->field_date_of_birth[LANGUAGE_NONE][0]['value']) ? date('d.m.Y', strtotime($order_user->field_date_of_birth[LANGUAGE_NONE][0]['value'])) : '';
+
+  $form['date_birth'] = array(
+    '#type' => 'textfield',
+    '#size' => 16,
+    '#format' => 'dd.mm.yy',
+    '#title' => t('Date of birth :'),
+    '#default_value' => $date_of_borth,
+    '#prefix' => '<div class="row">',
+    '#attributes' => array(
+      'class' => array('db_datepicker'),
+    ),
+
+  );
+  $id_number_issuing_date = isset($order_user->field_id_number_issuing_date[LANGUAGE_NONE][0]['value']) ? date('d.m.Y', strtotime($order_user->field_id_number_issuing_date[LANGUAGE_NONE][0]['value'])) : '';
+
+  $form['date_id'] = array(
+    '#type' => 'textfield',
+    '#size' => 16,
+    '#title' => t('ID Number Issuing Date :'),
+    '#format' => 'dd.mm.yy',
+    '#suffix' => '</div>',
+    '#attributes' => array(
+      'class' => array('dd_datepicker'),
+    ),
+    '#default_value' => $id_number_issuing_date,
+  );
+  $form['photo'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Please upload these forms of ID'),
+    '#attributes' => array('class' => array('row')),
+
+  );
+  $form['photo']['block_1'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="inline-block image-field-1">'
+  );
+  $form['photo']['profile'] = array(
+    '#type' => 'managed_file',
+    '#upload_location' => 'public://user_avatar/',
+    '#theme' => 'fapi_image_preview',
+    '#title' => t('Profile Picture:'),
+    '#default_value' => isset($order_user->picture->fid) ? $order_user->picture->fid : '',
+    //    '#required' => TRUE,
+    //  '#attributes' => array('class' => array('col-sm-3')),
+
+  );
+  $form['photo']['block_2'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div><div class="inline-block image-field-2">'
+  );
+  $form['photo']['img_cart_front'] = array(
+    '#type' => 'managed_file',
+    '#upload_location' => 'private://user_info/',
+    '#theme' => 'fapi_image_preview',
+    '#title' => t('ID Card ( Front )'),
+    '#default_value' => isset($order_user->field_id_card_front_[LANGUAGE_NONE][0]['fid']) ? $order_user->field_id_card_front_[LANGUAGE_NONE][0]['fid'] : '',
+    '#required' => TRUE,
+
+  );
+  $form['photo']['block_3'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div><div class="inline-block image-field-3">'
+  );
+
+  $form['photo']['img_cart_back'] = array(
+    '#type' => 'managed_file',
+    '#upload_location' => 'private://user_info/',
+    '#theme' => 'fapi_image_preview',
+    '#title' => t('ID Card ( Back )'),
+    '#default_value' => isset($order_user->field_id_card_back_[LANGUAGE_NONE][0]['fid']) ? $order_user->field_id_card_back_[LANGUAGE_NONE][0]['fid'] : '',
+    '#required' => TRUE,
+
+    //  '#attributes' => array('class' => array('col-sm-3')),
+
+  );
+  $form['photo']['block_4'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div><div class="inline-block image-field-4">'
+  );
+  $form['photo']['img_cart_security'] = array(
+    '#type' => 'managed_file',
+    '#upload_location' => 'private://user_info/',
+    '#theme' => 'fapi_image_preview',
+    '#title' => t('Social Security Card'),
+    '#default_value' => isset($order_user->field_social_security_card[LANGUAGE_NONE][0]['fid']) ? $order_user->field_social_security_card[LANGUAGE_NONE][0]['fid'] : '',
+    //   '#attributes' => array('class' => array('col-sm-3')),
+    '#required' => TRUE,
+
+  );
+  $form['photo']['block_5'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div>'
+  );
+  $form['back'] = array(
+    '#type' => 'submit',
+    '#title' => '',
+    '#attributes' => array('class' => array('back-button')),
+    '#submit' => array('_heydesk_form_back'),
+    '#prefix' => '<div class="bottom-buttom clearfix">',
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Next Step'),
+    '#attributes' => array('class' => array('button', 'button-submit')),
+    '#submit' => array('heydesk_proposal_order_form_page_tree_submit'),
+    '#prefix' => '<div class="btn_border"><span>',
+    '#suffix' => '</span></div></div></div></div>',
+  );
+  $form['#attached']['library'][] = array('system', 'ui.datepicker');
+  $form['#attached']['js'][] = drupal_get_path('module', 'heydesk_proposal_order') . '/js/heydesk-proposal-order.js';
+  $form['#attached']['css'][] = drupal_get_path('module', 'heydesk_user') . '/css/datepicker.skin-melon.css';
+
+
+  return $form;
+}
+
+function heydesk_proposal_order_form_page_tree_submit($form, &$form_state) {
+  $_SESSION['form_step'] = 5;
+  global $user;
+  $_SESSION['form_value']['step_tree']['user_proposal'] = $form_state['values']['user_proposal'];
+
+  $form_state['storage']['tree_step'] = $form_state['values'];
+  $_SESSION['form_value']['step_tree']['user_id'] = $user->uid;
+  $_SESSION['form_value']['step_tree'] = $form_state['values'];
+  $_SESSION['form_value']['step_tree']['proposal'] = $form_state['values']['proposal'];
+  $user = user_load($form_state['values']['user_id']);
+  $images = array(
+    $form_state['values']['profile'],
+    $form_state['values']['img_cart_front'],
+    $form_state['values']['img_cart_back'],
+    $form_state['values']['img_cart_security'],
+  );
+  foreach ($images as $fid) {
+    $file = file_load($fid);
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+    $user->file = $file->fid;
+    file_usage_add($file, 'user', 'user', $user->uid);
+  }
+  //  dpm($form_state);
+  $date_id = date('Y-d-m', strtotime($form_state['values']['date_id']));
+  // $user->field_country[LANGUAGE_NONE][0]['value'] = $form_state['values']['country'];
+  //  $user->field_address[LANGUAGE_NONE][0]['value'] = $form_state['values']['address'];
+  $user->field_id_number[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_number'];
+  //  $user->field_sities[LANGUAGE_NONE][0]['tid'] = $form_state['values']['sity'];
+  //  $user->field_id_number_issuing_date[LANGUAGE_NONE][0]['value'] = $date_id;
+  $user->field_id_card_front_[LANGUAGE_NONE][0]['fid'] = $form_state['values']['img_cart_front'];
+  $user->field_id_card_back_[LANGUAGE_NONE][0]['fid'] = $form_state['values']['img_cart_back'];
+  $user->field_social_security_card[LANGUAGE_NONE][0]['fid'] = $form_state['values']['img_cart_security'];
+  $user->field_user_avatar[LANGUAGE_NONE][0]['fid'] = $form_state['values']['profile'];
+  $user->picture->fid = $form_state['values']['profile'];
+  $user = user_save($user);
+  if ($user) {
+    drupal_set_message(t('User Data Save'));
+  }
+
+
+}
+
+function heydesk_proposal_order_form_page_foo() {
+
+  global $user;
+
+
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Book Workplace') . '</h1>',
+  );
+
+  $form['step_num'] = array(
+    '#type' => 'fieldset',
+    '#prefix' => '<div class="foo-form">',
+  );
+  $form['step_num']['step_1'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 1') . '<div>' . t('Your info') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_2'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 2') . '<div>' . t('Options') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_3'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 3') . '<div>' . t('Validation') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+  $form['step_num']['step_4'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Step 4') . '<div>' . t('Payment Method') . '</div>',
+    '#prefix' => '<div class="col-lg-3 col-md-3 col-sm-6 col-xs-6 step active">',
+    '#suffix' => '</div>',
+  );
+
+  $form['booking_price'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h2>' . t('Total: $ ') . $_SESSION['price'] . '.00</h2>',
+    '#prefix' => '<div class="wrapper-form">'
+  );
+  $form['price_value'] = array(
+    '#type' => 'value',
+    '#value' => $_SESSION['price'] . '.00',
+  );
+  $payment_account = heydesk_peyment_account_load($user->uid);
+  //  dpm($payment_account);
+
+  $difference = isset($payment_account) ? $payment_account->expanse - $_SESSION['price'] : -$_SESSION['price'];
+  $opportunity_to_buy = (isset($payment_account) && ($difference > 0)) ? 1 : FALSE;
+  $yo_balance = isset($payment_account) ? $payment_account->expanse : 0;
+  //  dpm($opportunity_to_buy);
+
+
+  //    dpm($difference);
+  $form['ammount_user'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h3>' . t('Your balance: $ ') . $yo_balance . ',00</h3>',
+
+  );
+  if ($payment_account && $opportunity_to_buy) {
+
+    $form['back'] = array(
+      '#type' => 'submit',
+      '#title' => '',
+      '#attributes' => array('class' => array('back-button')),
+      '#submit' => array('_heydesk_form_back'),
+    );
+    $form['submit1'] = array(
+      '#type' => 'submit',
+      '#value' => t('Pay'),
+      //     QuickPay
+      //////////////////
+      //    '#ajax' => array(
+      //
+      //      'callback' => 'heydesk_pay_submit',
+      //      'wrapper' => 'poll-choices',
+      //      'method' => 'replace',
+      //      'effect' => 'fade',
+      //
+      //    ),
+      //    /////////////
+      //        '#submit' => array('heydesk_pay_submit'),
+      '#submit' => array('heydesk_proposal_order_form_page_foo_submit'),
+      '#attributes' => array(
+        'class' => array('button'),
+
+      ),
+      '#prefix' => '<div class="btn_border"><span>',
+      '#suffix' => '</span></div>', //</div>',
+      //    '#suffix' => '</div>', //</div>',
+    );
+  }
+  else {
+    $seve_card = isset(user_load($user->uid)->field_quickpay_payments_id[LANGUAGE_NONE]) ? user_load($user->uid)->field_quickpay_payments_id[LANGUAGE_NONE][0]['value'] : FALSE;
+    $difference = !$payment_account ? 0 : $difference;
+
+    $_SESSION['price_all'] = $difference > 0 ? $difference : $difference * -1;
+
+    //
+    //dpm($_SESSION['price_all'] );
+
+    $form['top_text'] = array(
+      '#type' => 'markup',
+      '#markup' => '<h4>' . t('On your account has insufficient funds.') . '</h4>',
+
+    );
+    $form['top_text_1'] = array(
+      '#type' => 'markup',
+      '#markup' => '<h4>' . t('the shortage is: $ ') . $difference . '.00 </h4>',
+
+    );
+    //    if (!$seve_card) {
+    //      $form['remember_card'] = array(
+    //        '#type' => 'checkboxes',
+    //        '#title' => t('Want to keep your card details?'),
+    //        '#options' => array(
+    //          '0' => t('No'),
+    //          '1' => t('Yes'),
+    //
+    //        ),
+    //        '#required' => TRUE,
+    //      );
+    //
+    //        }
+    //  else {
+    //
+    //      $form['user_quicklpay'] = array(
+    //        '#type' => 'value',
+    //        '#value' => $seve_card,
+    //      );
+    //    }
+
+
+    // Get specific payment
+    //  $payments = $client->request->get('/payments/{id}');
+    //    $payment = $client->request->post("/payments", $order)->as_object();
+    //    dpm($payment);
+    //    $payment->link;
+
+
+    //  $form = array(
+    //    '#method' => 'POST',
+    //    '#action' => '/shop'
+    //  );
+
+
+    //    $form['pay_submit'] = array(
+    //      '#type' => 'link',
+    //      '#title' => t('Pay with credit/debit card'),
+    //      '#href' => heydesk_card_link($_SESSION['price']),
+    //      //      '#submit' => array('heydesk_quickpay_pay_submit_callback'),
+    //
+    //      '#attributes' => array(
+    //        'class' => array('button'),
+    //
+    //      ),
+    //      '#prefix' => '<div class="btn_border"><span>',
+    //      '#suffix' => '</span></div>',
+    //    );
+    $form['back'] = array(
+      '#type' => 'submit',
+      '#title' => '',
+      '#attributes' => array('class' => array('back-button')),
+      '#submit' => array('_heydesk_form_back'),
+    );
+    $form['pay_submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Pay with credit/debit card'),
+      '#submit' => array('heydesk_quickpay_pay_submit'),
+      //                '#ajax' => array(
+      //                  'callback' => 'heydesk_quickpay_pay_submit_callback'
+      //                ),
+      '#attributes' => array(
+        'class' => array('button'),
+
+      ),
+      '#prefix' => '<div class="btn_border"><span>',
+      '#suffix' => '</span></div>',
+    );
+
+
+  }
+
+
+  $form['end_form'] = array(
+    '#markup' => '</div></div>',
+    '#type' => 'markup'
+  );
+  //  $form['#attached']['js'] = array(
+  //    'https://payment.quickpay.net/embedded/v1/quickpay.js' => array(
+  //      'type' => 'external',
+  //    )
+  //  );
+  //  $form['#attached']['js'] = array(drupal_get_path('module', 'heydesk_external_api') . '/quickpay/heydesk_pay.js');
+
+
+  //    '#value' => t('Next Step'),
+  //    '#attributes' => array(
+  //      'class' => array('button', 'button-submit'),
+  //    ),
+
+
+  //
+  //  );
+  return $form;
+
+}
+
+
+function heydesk_quickpay_pay_submit($form, &$form_state) {
+  $user_quickpay = isset($form_state['values']['user_quicklpay']) ? $form_state['values']['user_quicklpay'] : FALSE;
+
+  $values = array(
+    'listing_data' => array(
+      'date_from' => $_SESSION['form_value']['step_second']['from_val'],
+      'date_to' => $_SESSION['form_value']['step_second']['to_val'],
+      'uid' => $_SESSION['form_value']['step_tree']['user_id'],
+      'pid' => $_SESSION['form_value']['step_tree']['user_proposal'],
+      'date' => $_SESSION['form_value']['step_tree']['proposal'],
+      'status' => 1,
+      'price' => $_SESSION['price'],
+    ),
+    'nid' => arg(1),
+    'userquickpay' => $user_quickpay,
+
+  );
+  $_SESSION['proporal_rental_data'] = $values;
+
+  $_SESSION['remember_cart'] = isset($form_state['values']['remember_card']) ? $form_state['values']['remember_card'] : FALSE;
+  if ($user_quickpay) {
+
+    $form_state['redirect'] = heydesk_payment_link($user_quickpay);
+  }
+  else {
+
+    $form_state['redirect'] = heydesk_card_link();
+  }
+
+
+}
+
+//
+//
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/QuickPay.php');
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Client.php');
+//require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Exception.php');
+//
+//
+////  $request = new QuickPay\QuickPay;
+//
+//class PaymentController {
+//  public function pay(Request $request) {
+//    $order = new Order([
+//      'name' => $request('name'),
+//      'address' => $request('address'),
+//      'zipcode' => $request('zipcode'),
+//      'city' => $request('city')
+//    ]);
+//    dpm($request);
+//
+//
+//    $order->save();
+//
+//    $client = new Client(":{$this->config('5a9fe8cf5c9e263fe5ce9ad4b299969e769e228e747e754adaa60650a241ab5c')}");
+//
+//    $token = $request('card_token');
+//
+//    $payment = $client->request->post("/payments", [
+//      'order_id' => $order->order_id, // Must be unique
+//      'currency' => 'EUR'
+//    ]);
+//    //      ->as_object();
+//
+//    $order->payment_id = $payment->id;
+//    $order->save();
+//
+//    $payment = $client->request->post("/payments/{$order->payment_id}/authorize?synchronized", [
+//      'amount' => 12,
+//      'card' => ['token' => $token]
+//    ]);
+//
+//    if ($payment->accepted) {
+//      $order->authorized = TRUE;
+//    }
+//
+//
+//    $authorize = end($payment->operations);
+//
+//    $order->qp_status_code = $authorize->qp_status_code;
+//    $order->qp_status_msg = $authorize->qp_status_msg;
+//    $order->aq_status_code = $authorize->aq_status_code;
+//    $order->aq_status_msg = $authorize->aq_status_msg;
+//    $order->save();
+//
+//    if ($order->authorized()) {
+//      $this->session('order_id', $order->id);
+//
+//
+//      $this->redirectTo('/payment/receipt');
+//    }
+//    else {
+//
+//
+//      $this->render('error');
+//    }
+//  }
+//
+//  public function receipt() {
+//    $order = Order::find($this->session('order_id'));
+//    $this->render('receipt', compact('order'));
+//  }
+//
+//  public function link() {
+//    //    $order = Order::find($this->session('order_id'));
+//    $link = $client->request->put("/payments/{$order->session('order_id')}/link", [
+//      'amount' => 100,
+//      'framed' => TRUE,
+//      'continue_url' => 'http://vk.com',
+//    ]);
+//    return $link['link.url'];
+//
+//
+//  }
+//
+//}
+
+
+function heydesk_proposal_order_form_page_foo_submit($form, &$form_state) {
+  // dpm($_SESSION['form_value']);
+  global $user;
+  $user = user_load($user->uid);
+
+
+  //  $_SESSION['form_value']['step_tree']['proposal'];
+  $desc = array(
+    'description' => t('Rent payment'),
+    'payment' => t('Rental')
+  );
+
+  //  dpm( $_SESSION['form_value']['step_tree']['user_proposal']);
+  $pay_status = heydesk_peyment_factoring($user->uid, $_SESSION['price'], 9999999, $desc);
+  //  dpm($pay_status);
+  if ($pay_status) {
+
+
+    $values = array(
+      'date_from' => $_SESSION['form_value']['step_second']['from_val'],
+      'date_to' => $_SESSION['form_value']['step_second']['to_val'],
+      'uid' => $_SESSION['form_value']['step_tree']['user_id'],
+      'pid' => $_SESSION['form_value']['step_tree']['user_proposal'],
+      'date' => $_SESSION['form_value']['step_tree']['proposal'],
+      'status' => 1,
+      'price' => $_SESSION['price'],
+    );
+
+    $seller = user_load($values['pid']);
+    $seller_mail = $seller->mail;
+    $buyer_mail = $user->mail;
+    $node = node_load($values['date']);
+    $from = variable_get('site_mail', '');
+    $vars_buyer = array(
+      'bayerName' => $user->field_first_name[LANGUAGE_NONE][0]['value'],
+      'bayerId' => $user->uid,
+    );
+    $vars_seller = array(
+      'sellerId' => $seller->uid,
+      'sellerName' => $seller->field_first_name[LANGUAGE_NONE][0]['value'],
+      'bayerName' => $user->field_first_name[LANGUAGE_NONE][0]['value'],
+      'listingName' => $node->title,
+    );
+
+
+    $heydesk_listing = entity_create('heydesk_listing', $values);
+    $heydesk_listing = entity_save('heydesk_listing', $heydesk_listing);
+
+    if ($heydesk_listing) {
+      unset($_SESSION['form_step']);
+      unset($_SESSION['form_value']);
+      drupal_set_message(t('Your booking was submitted!'));
+      $mail_acsses = isset($seller->field_receive_e_mail_with_activi[LANGUAGE_NONE][0]['value']) ? $seller->field_receive_e_mail_with_activi[LANGUAGE_NONE][0]['value'] : 0;
+
+      drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_create_buyer', $buyer_mail, language_default(), $vars_buyer, $from);
+      if ($mail_acsses == 1) {
+
+        drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_create_seller', $seller_mail, language_default(), $vars_seller, $from);
+        //        $mail = heydesk_mail_receive_mail_message($user_proposal, 'bookings');
+      }
+//      $info = heydesk_mail_reactions_to_event();
+      $form_state['redirect'] = 'user/' . $values['uid'] . '/booking-overview';
+
+
+    }
+  }
+  else {
+
+    $form_state['redirect'] = 'user/' . $_SESSION['form_value']['step_tree']['user_id'] . '/';
+
+  }
+}
+
+function _heydesk_form_back($form, &$form_state) {
+  //  dpm($_SESSION['form_step']);
+  $step = $_SESSION['form_step'];
+  $backStep = 1;
+  if ($step == 3) $backStep = 2;
+  $_SESSION['form_step'] = $step - $backStep;
+}

@@ -1,0 +1,259 @@
+<?php
+	/**
+	 * Implements hook_init().
+	 */
+	function heydesk_fields_init(){
+		drupal_add_css(drupal_get_path('module', 'heydesk_fields') . '/css/slick.css');
+		drupal_add_js(drupal_get_path('module', 'heydesk_fields') . '/js/slick.js');
+		drupal_add_css(drupal_get_path('module', 'heydesk_fields') . '/css/jcarousel.css');
+		drupal_add_js(drupal_get_path('module', 'heydesk_fields') . '/js/jquery.jcarousel.js');
+		drupal_add_js(drupal_get_path('module', 'heydesk_fields') . '/js/jcarousel-basic.js');
+	}
+
+	/**
+	 * Implement hook_field_info()
+	 */
+	function heydesk_fields_field_info(){
+		return array(
+			'mobile_number' => array(
+				'label'             => t('Mobile Number'),
+				'description'       => t('Mobile number field'),
+				'default_widget'    => 'mobile_number_widget',
+				'default_formatter' => 'mobile_number_formatter'
+			)
+		);
+	}
+
+	/**
+	 * Implement hook_field_schema()
+	 */
+	function heydesk_fields_field_schema($field){
+		$columns = array(
+			'code'   => array(
+				'type'     => 'varchar',
+				'length'   => 7,
+				'not null' => FALSE,
+			),
+			'number' => array(
+				'type'     => 'int',
+				'length'   => 7,
+				'not null' => FALSE,
+			)
+		);
+		return array(
+			'columns' => $columns,
+		);
+	}
+
+	/**
+	 * Implement hook_field_validate()
+	 */
+	function heydesk_fields_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors){
+		foreach ($items as $delta => $item) {
+			if (!empty($item['code']) && !empty($item['number'])) {
+				if (!preg_match()) {
+					$errors[$field['field_name']][$langcode][$delta][] = array(
+						'error'   => 'heydesk_fields_invalid',
+						'message' => t(''),
+					);
+				}
+			}
+		}
+	}
+
+	/**
+	 * hook_field_is_empty()
+	 */
+	function heydesk_fields_field_is_empty($item, $field){
+		return empty($item['number']);
+	}
+
+	/**
+	 *  Implement hook_field_widget_info()
+	 */
+	function heydesk_fields_field_widget_info(){
+		return array(
+			'heydesk_fields_widget' => array(
+				'label'       => t('Mobile Number'),
+				'field types' => array('mobile_number'),
+			),
+			//    'heydesk_fields_amenities' => array(
+			//      'label' => t('Amenities'),
+			//      'field types' => array('long_tezt'),
+			//    ),
+		);
+
+	}
+
+	/**
+	 * Implements hook_field_formatter_info().
+	 */
+	function heydesk_fields_field_formatter_info(){
+
+		return array(
+			'heydesk_fields_proposal_slide' => array(
+				'label'       => t('Image Proposal Slider'),
+				'field types' => array('image'),
+				'settings'    => array(
+					'image_style_slide' => '',
+				),
+			),
+			'mobile_number_formatter'       => array(
+				'label'       => t('Mobile number'),
+				'field types' => array('mobile_number'),
+			),
+			'heydesk_fields_amenities'      => array(
+				'label'       => t('Amenities'),
+				'field types' => array('text_long'),
+			),
+			'heydesk_fields_hours_list'     => array(
+				'label'       => t('Day of week'),
+				'field types' => array('list_text'),
+			),
+		);
+	}
+
+	/**
+	 * Implements hook_field_formatter_settings_form().
+	 */
+	function heydesk_fields_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state){
+		//This gets the view_mode where our settings are stored
+		$display = $instance['display'][$view_mode];
+		//This gets the actual settings
+		$settings = $display['settings'];
+
+		switch ($display['type']) {
+			case 'heydesk_fields_proposal_slide':
+				$element = array();
+				$image_styles = array();
+				foreach (image_styles() as $name => $image_style) {
+					$image_styles[$name] = $image_style['label'];
+				}
+				$element['image_style_slide'] = array(
+					'#type'          => 'select',
+					'#title'         => t('Image Proposal Slider'),
+					'#default_value' => $settings['image_style_slide'],
+					'#options'       => $image_styles
+				);
+				break;
+
+
+		}
+		return $element;
+
+	}
+
+	/**
+	 * Implements hook_field_formatter_settings_summary().
+	 */
+	function heydesk_fields_field_formatter_settings_summary($field, $instance, $view_mode){
+		$display = $instance['display'][$view_mode];
+		switch ($display['type']) {
+			case 'heydesk_fields_proposal_slide':
+				$settings = $display['settings'];
+				$image_styles = image_styles();
+				$style_name = isset($image_styles[$settings['image_style_slide']]['label']) ? $image_styles[$settings['image_style_slide']]['label'] : 'Original';
+				$summary = t('Image size @style', array(
+					'@style' => $style_name
+				));
+				return $summary;
+		}
+
+	}
+
+
+	/**
+	 * Implements hook_field_formatter_view().
+	 */
+	function heydesk_fields_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display){
+		if (!count($items)) {
+			return;
+		}
+		switch ($display['type']) {
+			case 'heydesk_fields_proposal_slide':
+				$element = array();
+				$settings = $display['settings'];
+				$count = 1;
+				$output = '<div class="slider-wrapper">';
+				$output .= '<div class="proposal-photo-wrapper">';
+				foreach ($items as $delta => $image) {
+					$output .= '<div class="proposal-photo-item">';
+					$output .= theme('image_style', array(
+						'style_name' => $settings['image_style_slide'],
+						'path'       => $image['uri'],
+						'title'      => $image['title'],
+						'alt'        => $image['alt']
+					));
+					$output .= '</div>';
+					$count++;
+				};
+				$output .= '</div>';
+				$output .= '<a class="controll control-prev" data-jcarouselcontrol="true"></a>';
+				$output .= '<a class="controll control-next" data-jcarouselcontrol="true"></a>';
+				$output .= '</div>';
+
+				$element[0]['#markup'] = $output;
+
+				return $element;
+				break;
+			case 'heydesk_fields_hours_list':
+				$element = array();
+				$allowed_values = list_allowed_values($field, $instance, $entity_type, $entity);
+				$values_ar = array('mon', 'tue', 'wen', 'thu', 'fri');
+
+
+				$output = '';
+				$array_value = array();
+
+
+				foreach ($items as $delta => $item) {
+					$array_value[$delta] = $item['value'];
+
+
+					$output .= field_filter_xss($allowed_values[$item['value']]);
+					$output .= '<br />';
+
+				};
+//      $comparison =  array_diff($array_value, $values_ar);
+				$output = empty(array_diff($array_value, $values_ar)) ? t('Monday - Friday') : $output;
+//      dpm($comparison);
+//      dpm($array_value);
+
+				$element[0]['#markup'] = $output;
+				return $element;
+
+				break;
+
+
+			case 'heydesk_fields_amenities':
+				$element = array();
+
+				$element[0]['#markup'] = _amenties_array_render($items);
+
+				return $element;
+
+
+				break;
+		}
+
+	}
+
+	function _amenties_array_render($items){
+		$value = explode(', ', $items[0]['value']);
+		$output = '<div class="amenities"><div class="columns">';
+		$count = 1;
+		foreach ($value as $item) {
+			if ($count != 4) {
+				$output .= '<span slass="amenities_item item-' . $count . '">' . $item . '</span>';
+				++$count;
+			} else {
+
+				$output .= '<span slass="amenities_item item-' . $count . '">' . $item . '</span></div><div class="columns">';
+				$count = 1;
+			}
+			$output .= ' ';
+		}
+		$output .= '</div></div>';
+		return $output;
+
+	}

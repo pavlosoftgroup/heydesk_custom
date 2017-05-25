@@ -1,0 +1,26 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_listing_schema()
+{
+  $schema['heydesk_listing'] = array(
+    'description' => t('Table for listing'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'date_from'       => array('type' => 'varchar', 'length' => 24, 'not null' => TRUE,  'description' => t('Date from')),
+      'date_to'       => array('type' => 'varchar', 'length' => 24, 'not null' => TRUE,  'description' => t('Date to')),
+      'price'        => array('type' => 'text', 'size' => 'small',  'description' => t('Price')),
+      'uid'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('User ID of tenent')),
+      'pid' => array('type' => 'int', 'length' => 8, 'not null' => TRUE, 'description' => t('ID proposal')),
+      'date' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'description' => t('Listing date')),
+      'status' => array('type' => 'char', 'length' => 1, 'not null' => TRUE, 'default' => '0', 'description' => t('Message status')),
+    ),
+    'indexes' => array(
+      'title' => array('pid')
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

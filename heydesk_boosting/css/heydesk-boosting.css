@@ -1,0 +1,268 @@
+div.ctools-modal-content .modal-content{
+   /*padding: 0 !important;*/
+}
+
+.ctools-modal-content .proposal_view{
+    font-size: 0;
+}
+
+.ctools-modal-content .boosting_list, .ctools-modal-content .form-item-text, .ctools-modal-content .form-item-radios{
+    margin: 0 30px 10px 20px;
+}
+
+.ctools-modal-content .form-item-radios{
+    border-bottom: 1px solid #d4d4d4;
+}
+
+#edit-radios .form-item-radios{
+  border-bottom: 0;
+}
+
+#edit-radios .form-item-radios:last-child{
+  padding-bottom: 15px;
+}
+
+#modalBackdrop .ctools-modal-content .modal-header{
+    background-color: #eaeaea !important;
+}
+
+.ctools-modal-content .boosting-top{
+     margin: -1em -1em 0 -1em;
+     background: #eaeaea;
+}
+
+.ctools-modal-content .proposal_image img{
+    width: 100px;
+    height: 85px;
+    border-radius: 6px;
+    margin: 0 15px;
+    margin-bottom: 15px;
+}
+
+.ctools-modal-content .proposal_info{
+    display: inline-block;
+    width: 55%;
+    height: 98px;
+    font-size: 15px;
+    vertical-align: top;
+    font-weight: 600;
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+ .ctools-modal-content .proposal_image{
+    display: inline-block;
+    width: 30%;
+    vertical-align: top;
+}
+
+.ctools-modal-content .proposal_info a{
+    color: #333;
+    font-weight: 600;
+}
+
+/*.ctools-modal-content .boosting_list{
+   background-image: url('../../../../themes/heydesk/images/modal_boost.jpg');
+   background-position: top right;
+}*/
+
+.ctools-modal-content .boosting_list ul li{
+   background-image: url('../../../../themes/heydesk/images/popup_check.png');
+   background-position: left top;
+   -webkit-background-size: 20px;
+   background-size: 20px;
+   background-repeat: no-repeat;
+   padding-left: 30px;
+   margin-top: 6px;
+   font-size: 15px;
+   font-weight: 600;
+}
+
+.ctools-modal-content .boosting_list ul{
+   margin-top: 20px;
+   margin-left: 15px;
+}
+
+.ctools-modal-content #edit-text{
+   border: 1px solid #333;
+   border-radius: 6px;
+   padding: 0 8px;
+   font-size: 15px;
+   height: 40px;
+}
+
+.ctools-modal-content .boosting_list, .ctools-modal-content .form-item label{
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 20px;
+}
+
+.ctools-modal-content #edit-radios label{
+   font-size: 15px;
+}
+
+.ctools-modal-content #edit-radios input[type="radio"]{
+   display: none;
+}
+
+.ctools-modal-content #edit-radios input[type="radio"] + label::before{
+   display: inline-block;
+   content: '';
+   width: 16px;
+   height: 16px;
+   border: 1px solid #333;
+   border-radius: 50px;
+   margin-right: 10px;
+   vertical-align: text-bottom;
+}
+
+.ctools-modal-content #edit-radios input[type="radio"]:checked + label::before{
+   border: none;
+   background-color: #EC1F60;
+}
+
+.ctools-modal-content #boosting-start-form .button{
+    float: right;
+    display: inline-block;
+    width: 140px;
+    height: 50px;
+    margin-bottom: 30px;
+    margin-top: 20px;
+    margin-right: 30px;
+    font-weight: normal;
+}
+
+.ctools-modal-content #boosting-start-form .button #edit-cansel{
+    margin: 0 ;
+    width: 100%;
+    height: 100%;
+    background-color: #333!important;
+    border-radius: 6px;
+}
+
+.ctools-modal-content #boosting-start-form .button.submit{
+    border: 1px solid white;
+    margin-right: 15px;
+}
+
+.ctools-modal-content #boosting-start-form .button #edit-cansel:hover{
+    border: 3px solid #333;
+    color: #333;
+    background-color: white!important;
+}
+
+.ctools-modal-content #boosting-start-form .button:last-child{
+   position: relative;
+}
+
+.ctools-modal-content #boosting-start-form .button:last-child::before{
+   position: absolute;
+   display: inline-block;
+   content: '';
+   width: 134px;
+   height: 32px;
+   top: 3px;
+   left: 3px;
+   border: 1px solid #fff;
+   border-radius: 6px;
+}
+
+div.ctools-modal-content .modal-header {
+    background-color: #eaeaea!important;
+}
+
+/*Preview poopup*/
+
+.ctools-modal-content .listing-popup .boosting-top {
+  height: 100%;
+  margin-bottom: 20px;
+}
+.ctools-modal-content .listing-popup .proposal_view {
+  position: relative;
+  margin-bottom: 25px
+}
+
+.ctools-modal-content .listing-popup .proposal_image img{
+  margin-bottom: 0;
+  max-width: 60%;
+  height: auto;
+}
+
+.ctools-modal-content .listing-popup .proposal_info {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: inherit;
+  margin-bottom: 0;
+}
+.ctools-modal-content .listing-popup .modal-proposal-title {
+  font-size: 17px;
+}
+
+.ctools-modal-content .listing-popup .proposal-details {
+  font-size: 17px;
+  margin-bottom: 20px;
+}
+
+.ctools-modal-content .proposal-details .rental-info span {
+  line-height: 25px;
+  padding: 0 15px;
+}
+
+.ctools-modal-content .proposal-details span {
+  display: inline-block;
+}
+
+.ctools-modal-content .proposal-details .rental-earn,
+.ctools-modal-content .proposal-details .rental-status {
+  margin: 20px -16px;
+  padding: 0 15px;
+  line-height: 40px;
+}
+
+.ctools-modal-content .proposal-details .rental-earn {
+  background: linear-gradient(to right, rgba(255, 12, 93, 1) 0%, rgba(255, 137, 63, 1) 100%);
+  color: #fff;
+}
+
+.ctools-modal-content .proposal-details .rental-status {
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+}
+
+.ctools-modal-content .proposal-details .rental-status .status-0 {
+  color: #FF0A5E;
+}
+
+.ctools-modal-content .proposal-details .rental-status .status-2 {
+  color: #008E45;
+}
+
+.ctools-modal-content .listing-popup .earn-text,
+.ctools-modal-content .listing-popup .rental-dates {
+  width: 75%;
+}
+
+
+.ctools-modal-content .listing-popup .earn-price,
+.ctools-modal-content .listing-popup .rental-price {
+  width: 24%;
+  text-align: right;
+}
+
+.ctools-modal-content .listing-popup .user-details {
+  padding: 0 15px;
+  margin-bottom: 25px;
+}
+
+.ctools-modal-content .listing-popup .user-details > div {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.ctools-modal-content .listing-popup .user-details .user-photo {
+  margin-right: 15px;
+}
+
+.ctools-modal-content .listing-popup .user-details img {
+  border-radius: 50%;
+}

@@ -1,0 +1,194 @@
+<?php
+
+function heydesk_stars_rating_menu() {
+  $items['rating/%/%/%/%ctools_js/%'] = array(
+    'title' => t('Heydesk Rating'),
+    'page callback' => 'heydesk_rating_ajax_callback',
+    'page arguments' => array(1, 2, 3, 4, 5),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    //    'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+  );
+
+
+  return $items;
+}
+
+function heydesk_stars_rating_entity_info() {
+  return array(
+    'heydesk_stars_rating' => array(
+      'label' => t('Rating Stars'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'views controller class' => 'EntityDefaultViewsController',
+      'base table' => 'heydesk_stars_rating',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      //    'admin ui' => array(
+      //      'path' => 'admin/config/heydesk/messenger'
+      //    ),
+      'access callback' => 'heydesk_stars_rating_access',
+      'module' => 'heydesk_stars_rating',
+    ),
+  );
+}
+
+function heydesk_stars_rating_access($op, $entity, $account = NULL, $entity_type = 'heydesk_stars_rating') {
+  return user_access('heydesk user');
+}
+
+function heydesk_stars_rating_load($id) {
+  $result = entity_load('heydesk_stars_rating', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+function heydesk_stars_rating_list($pid, $listing_id, $rating = NULL) {
+  $uid = user_load(arg(1))->uid;
+  if ($rating == NULL) {
+    $query = db_select('heydesk_stars_rating', 'hs')
+      ->fields('hs', array('rating'))
+      ->condition('hs.listing', $listing_id);
+    //      ->condition('hs.pid', $pid);
+    $rating = $query->execute()->fetchField();
+  }
+
+  heydesk_ctools_popup_style();
+
+  $result = array();
+  if ($rating) {
+    for ($i = 1; $i < 6; $i++) {
+
+
+      $star = $rating <= 0 ? '<i class="fa fa-star-o" aria-hidden="true"></i>' : '<i class="fa fa-star" aria-hidden="true"></i>';
+      $result[$i] = $star;
+
+      $rating--;
+    }
+  }
+  else {
+    for ($i = 1; $i < 6; $i++) {
+
+      $result[$i] = l('<i class="fa fa-star-o" aria-hidden="true"></i>', 'rating/' . $uid . '/' . $pid . '/' . $i . '/nojs/' . $listing_id, array(
+        'attributes' => array(
+          'class' => array(
+            'stars',
+            'dark_link',
+            'ctools-use-modal',
+            //          'use-ajax',
+            'ctools-modal-first-popup-style'
+          )
+        ),
+        'html' => TRUE,
+      ));
+    }
+  }
+
+  return implode(' ', $result);
+}
+
+function heydesk_rating_ajax_callback($uid, $pid, $rating, $js = NULL, $listing_id) {
+  //  $query = db_select('heydesk_stars_rating', 'hs')
+  //    ->fields('hs', array('listing'))
+  //    ->condition('hs.uid', $uid)
+  //    ->condition('hs.pid', $pid)
+  //    ->execute()
+  //    ->fetchField();
+  $form_state = array(
+    'ajax' => TRUE,
+    'title' => t('Rating'),
+    'pid' => $pid,
+    'rating' => $rating,
+    'listing' => $listing_id,
+  );
+
+  $count = db_select('heydesk_stars_rating', 'hc')
+    ->condition('hc.pid', $pid)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+  $node = node_load($pid);
+
+  $all_rating = $node->field_stars[LANGUAGE_NONE][0]['value'];
+   $values = array(
+    'uid' => $uid,
+    'pid' => $pid,
+    'rating' => $rating,
+    'date' => time(),
+    'listing' => $listing_id,
+  );
+  $entity_rating = entity_create('heydesk_stars_rating', $values);
+  $entity_rating = entity_save('heydesk_stars_rating', $entity_rating);
+  if ($entity_rating) {
+    $user_vote = user_load($uid);
+    $user_vote_name = _heydesk_user_full_name($user_vote);
+    $values_message = array(
+      'title' => t('@user gave you @stars stars', array('@user' => $user_vote_name,  '@stars' => $rating)),
+      'message' => t('@user voted for your suggestion of putting @stars stars', array('@user' => $user_vote_name,  '@stars' => $rating)),
+      'uid' => $user_vote->uid,
+      'sid' => $node->uid,
+      'status' => 1,
+      'date' => time(),
+    );
+    $hyedesk_messenger = entity_create('hyedesk_messenger', $values_message);
+    $hyedesk_messenger = entity_save('hyedesk_messenger', $hyedesk_messenger);
+  }
+
+  $message = $entity_rating ? t('Your vote has been counted') : t('Error. Your vote is not counted');
+  $all_rating = ($all_rating * $count + $rating) / ($count + 1);
+  $node->field_stars[LANGUAGE_NONE][0]['value'] = round($all_rating);
+  $field_info = field_info_field('field_stars');
+  field_sql_storage_field_storage_write('node', $node, 'update', array($field_info['id']));
+  cache_clear_all("field:node:{$node->nid}", 'cache_field');
+
+  $form_state['message'] = $message;
+
+
+  if (!$js) {
+    return drupal_get_form('heydesk_rating_form');
+  }
+  ctools_include('ajax');
+  ctools_include('modal');
+
+  $output = ctools_modal_form_wrapper('heydesk_rating_form', $form_state);
+  print ajax_render($output);
+  drupal_exit();
+
+
+}
+
+function heydesk_rating_form($form, $form_state) {
+  $form = array();
+  $form['some_text'] = array(
+    '#markup' => '<div>' . $form_state['message'] . '</div>',
+    '#type' => 'markup',
+  );
+  $form['pid'] = array(
+    '#type' => 'value',
+    '#value' => $form_state['listing']
+  );
+  ctools_include('modal');
+  ctools_include('ajax');
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('OK'),
+    '#ajax' => array(
+      'callback' => 'heydesk_rating_form_submit',
+    ),
+  );
+  return $form;
+}
+
+function heydesk_rating_form_submit($form, &$form_state) {
+  ctools_include('modal');
+  ctools_include('ajax');
+  $commands[] = ajax_command_html('.stars-rating-' . $form_state['listing'], heydesk_stars_rating_list($form_state['pid'], $form_state['listing'], $form_state['rating']));
+
+
+  $commands[] = ctools_modal_command_dismiss();
+  print ajax_render($commands);
+  exit;
+}

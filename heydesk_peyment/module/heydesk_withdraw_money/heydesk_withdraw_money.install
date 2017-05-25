@@ -1,0 +1,60 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_withdraw_money_schema() {
+  $schema['heydesk_withdraw_money'] = array(
+    'description' => t('Table Withdraw Money'),
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'size' => 'normal',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'description' => t('Primary key')
+      ),
+      'date' => array(
+        'type' => 'varchar',
+        'length' => 24,
+        'not null' => TRUE,
+        'description' => t('Date')
+      ),
+      'date_end' => array(
+        'type' => 'varchar',
+        'length' => 24,
+        'not null' => TRUE,
+        'description' => t('Date end')
+      ),
+      'amount' => array(
+        'type' => 'text',
+        'size' => 'small',
+        'description' => t('Amount')
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'length' => 8,
+        'not null' => TRUE,
+        'description' => t('User ID of Withdraw')
+      ),
+      'data' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'description' => t('Withdraw data')
+      ),
+      'status' => array(
+        'type' => 'char',
+        'length' => 1,
+        'not null' => TRUE,
+        'default' => '0',
+        'description' => t('Withdraw status')
+      ),
+    ),
+//    'indexes' => array(
+//      'title' => array('amount')
+//    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

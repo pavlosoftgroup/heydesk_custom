@@ -1,0 +1,11 @@
+name = Heydesk Withdraw Money
+description = Realisation withdraw money system in site
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_withdraw_money.module
+files[] = heydesk_withdraw_money.install
+
+dependencies[] = heydesk_custom_function
+dependencies[] = heydesk_peyment
+dependencies[] = entity
+

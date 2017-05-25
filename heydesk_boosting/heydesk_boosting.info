@@ -1,0 +1,9 @@
+name = Heydesk Boost
+description = Realisation proposal Boost
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_boosting.module
+;files[] = heydesk_boosting.install
+
+dependencies[] = heydesk_custom_function
+dependencies[] = heydesk_peyment

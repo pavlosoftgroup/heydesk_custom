@@ -1,0 +1,1049 @@
+<?php
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/QuickPay.php');
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Client.php');
+require_once(drupal_get_path('module', 'heydesk_peyment') . '/QuickPay/API/Exception.php');
+
+use QuickPay\QuickPay;
+
+module_load_include('inc', 'heydesk_peyment', 'inc/heydesk_peyment.admin');
+
+//register
+function heydesk_peyment_entity_info() {
+  return array(
+    'heydesk_peyment' => array(
+      'label' => t('Order payment'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      //      'views controller class' => 'EntityDefaultViewsController',
+      'base table' => 'heydesk_peyment_remittance',
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      'access callback' => 'heydesk_peyment_access',
+      'module' => 'heydesk_peyment',
+    ),
+    'heydesk_peyment_account' => array(
+      'label' => t('User payment Account'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'heydesk_peyment_account',
+      'entity keys' => array(
+        'id' => 'id',
+      ),
+      'admin ui' => array(
+        'path' => 'admin/config/administration/payment'
+      ),
+      'access callback' => 'heydesk_peyment_access_super',
+      'module' => 'heydesk_peyment',
+    )
+  );
+
+}
+
+function heydesk_peyment_access($op, $entity, $account = NULL, $entity_type = 'heydesk_peyment') {
+  return user_access('heydesk user');
+}
+
+function heydesk_peyment_access_super($op, $entity, $account = NULL, $entity_type = 'heydesk_peyment_account') {
+  return user_access('heydesk user');
+}
+
+function heydesk_peyment_load($id) {
+  $result = entity_load('heydesk_peyment', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+function heydesk_peyment_account_load($uid) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'heydesk_peyment_account')
+    ->propertyCondition('owner_id', $uid);
+  $results = $query->execute();
+  $id = array();
+  if (isset($results['heydesk_peyment_account'])) {
+    foreach ($results['heydesk_peyment_account'] as $ids) {
+      $id[] = $ids->id;
+
+    }
+    //  return $id;
+    $result = entity_load('heydesk_peyment_account', $id);
+    return $result ? reset($result) : FALSE;
+  }
+  else {
+    return FALSE;
+  }
+
+}
+
+
+function heydesk_peyment_menu() {
+  $items['user/%/deposit'] = array(
+    'title' => t('Deposit'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_deposite_page_form', 1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['pay'] = array(
+    'title' => t('Card pay Callback'),
+    'page callback' => 'heydesk_quickpay_pay_callback',
+    //          'page arguments' => array(1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  //  $items['quickpay/%'] = array(
+  //    'title' => t('Card pay Callback'),
+  //    'page callback' => 'heydesk_card_pay_quickpay_callback',
+  //    'page arguments' => array(1),
+  //    'access arguments' => array(TRUE),
+  //    'type' => MENU_CALLBACK,
+  //    //      'delivery callback' => 'ajax_deliver',
+  //  );
+  $items['quickpay/deposit'] = array(
+    'title' => t('Card pay Callback'),
+    'page callback' => 'heydesk_pay_deposit_callback',
+    //      'page arguments' => array(2),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    //      'delivery callback' => 'ajax_deliver',
+  );
+  $items['quickpay'] = array(
+    'title' => t('Card pay Callback'),
+    'page callback' => 'heydesk_post_pay_quickpay_callback',
+    //    'page arguments' => array(1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+    //      'delivery callback' => 'ajax_deliver',
+  );
+  return $items;
+}
+
+function heydesk_peyment_user_incert(&$edit, $account, $category) {
+
+  $values = array(
+    'owner_id' => $account->uid,
+    'expanse' => 0,
+    'status_key' => '',
+    'status' => 1,
+  );
+  $heydesk_peyment_account = entity_create('heydesk_peyment_account', $values);
+  $heydesk_peyment_account = entity_save('heydesk_peyment_account', $heydesk_peyment_account);
+  if ($heydesk_peyment_account) {
+    watchdog('heydesk_peyment', 'Payment account for user id  %uid complete', array(
+      '%id' => $account->uid,
+      WATCHDOG_NOTICE,
+      $link = NULL
+    ));
+  }
+}
+
+function heydesk_listing_end_actions($uid) {
+
+  $query = db_select('heydesk_listing', 'hl')
+    ->fields('hl')
+    ->condition('hl.pid', $uid);
+  $query->condition('hl.status', 2);
+
+  $bookings = $query->execute()->fetchAll();
+  $desc = array(
+    'payment' => t('Rent end'),
+    'description' => t('Rent payment'),
+  );
+
+  foreach ($bookings as $booking) {
+    if (time() > $booking->date_to) {
+      $percent = ($booking->price / 100) * 15;
+      $percent = round($percent);
+      $price = $booking->price - $percent;
+
+      $order = heydesk_peyment_factoring(9999999, $price, $booking->pid, $desc);
+      $booking->status = 3;
+      entity_save('heydesk_listing', $booking);
+
+
+    }
+
+  }
+
+
+  return TRUE;
+
+
+}
+
+function heydesk_balance_list($uid) {
+
+  global $user;
+  $end = heydesk_listing_end_actions($user->uid);
+
+  //$orderrs = entity_load('heydesk_peyment', FALSE, array('payee_ius' => $user->uid));
+  $orders = db_select('heydesk_peyment_remittance', 'hp')
+    ->fields('hp', array('id'))
+    ->condition(db_or()
+      ->condition('hp.payee_ius', $user->uid)
+      ->condition('hp.payer_uid', $user->uid))
+    ->orderBy('hp.id', 'DESC')// ->condition('hp.uid', 1)
+    ->execute()
+    ->fetchCol();
+  $orders = entity_load('heydesk_peyment', $orders);
+    dpm($orders);
+
+
+  $output = '<div class="table-balance">';
+  $output .= '<h1>' . t('Balance') . '</h1>';
+  $header = array(
+    t('Date'),
+    t('Description'),
+    t('User'),
+    t('Payment'),
+    t('Amount'),
+    t('Free'),
+    t('Income'),
+    t('Balance')
+  );
+  $rows = array();
+
+  foreach ($orders as $order) {
+    $date = date('m/d', $order->date);
+    $date .= '<br />';
+    $date .= date('G:i', $order->date);
+    $sign = $order->payer_uid == $user->uid ? '-' : '';
+
+    $payer = $order->payer_uid == $user->uid ? $order->payee_ius : $order->payer_uid;
+    $payer = $order->payer_uid == 0 ? ' ' : $payer;
+    $payer = $order->payer_uid == 9999999 ? t('Heydesk') : $payer;
+    $payer = $order->payee_ius == 9999999 ? t('Heydesk') : $payer;
+    $balance = $order->payer_uid == $user->uid ? $order->balance_payer : $order->data;
+    $free = '';
+    if(($order->description == 'Rent payment')&& ( $order->payment == 'Rent end')) {
+      $free = '-15%';
+
+    }
+
+
+
+
+    $rows[] = array(
+      $date,
+      $order->description,
+      $payer,
+      $order->payment,
+      $sign . $order->remittance,
+      $free,
+      '',
+      $balance,
+
+
+    );
+
+  }
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  $output .= '</div>';
+  $block = block_load('heydesk_user', 'heydesk_user_pay_account_block');
+  $render_array = _block_get_renderable_array(_block_render_blocks(array($block)));
+
+  $output .= render($render_array);
+
+  return $output;
+}
+
+function _heydesk_user_name($uid) {
+  $heydesk_user = user_load($uid);
+  $surmame = field_view_field('user', $heydesk_user, 'field_first_name', array(
+    'label' => 'hidden',
+  ));
+  $first_name = field_view_field('user', $heydesk_user, 'field_surname', array(
+    'label' => 'hidden',
+  ));
+  return render($surmame) . ' ' . render($first_name);
+}
+
+function heydesk_payment_link_deposit($card = FALSE) {
+  global $base_url;
+  $api_key = variable_get('heydesk_quickpay_key', '');
+  $client = new QuickPay(":{$api_key}");
+
+  if ($card) {
+
+    $site_order_id = rand(100000, 999999);
+
+
+    $order = array(
+      'order_id' => $site_order_id, // Must be unique
+      'currency' => 'USD'
+    );
+
+
+    $token = $client->request->post("/cards/{$card}/tokens")->asArray();
+
+    $peyment = $client->request->post('/payments', $order)->asObject();
+    $payment_id = $peyment->id;
+
+
+    //  $paement_client = array(
+    //    'amount' => $_SESSION['price_all'] * 100,
+    //    'card' => array(
+    //      'token' => $token['token']
+    //    ),
+    //  );
+
+    $link_array = array(
+      'amount' => $_SESSION['amount_daposit'] * 100,
+      //    'continue_url' => $base_url . '/user/' . $user->uid . '/booking-overview',
+      'continue_url' => $base_url . '/quickpay/deposit',
+      'callback_url' => $base_url . '/quickpay/deposit',
+      'cancelurl' => $base_url . '/user/' . $_SESSION['user_deposit'] . '/deposit',
+      'reference_title' => t('Heydesk Rental'),
+      'branding_id' => 4479,
+      'framed' => TRUE
+      // Must be unique
+      //        'currency' => 'EUR'
+    );
+    $link = $client->request->put("/payments/{$payment_id}/link", $link_array)
+      ->asObject();
+    $_SESSION['peyment_deposit_id'] = $payment_id;
+  }
+  else {
+    $card = $client->request->post("/cards")->asObject();
+
+    $ammount = array(
+      //    'amount' => $amount,
+      //    'continue_url' => $base_url . '/user/' . $user->uid . '/booking-overview',
+      'continueurl' => $base_url . '//quickpay/deposit',
+      'callbackurl' => $base_url . '//quickpay/deposit',
+      'cancelurl' => $base_url . '/user/' . $_SESSION['user_deposit'] . '/deposit',
+      'branding_id' => 4479,
+      'framed' => TRUE
+      // Must be unique
+      //        'currency' => 'EUR'
+    );
+
+    $link = $client->request->put("/cards/{$card->id}/link", $ammount)
+      ->asObject();
+    $_SESSION['pay_deposit_capd'] = array(
+      'card' => $card->id
+    );
+  }
+  return $link->url;
+}
+
+function heydesk_pay_deposit_callback() {
+  if (isset($_SESSION['pay_deposit_capd'])) {
+
+    $result = heydesk_card_pay_quickpay_callback($_SESSION['pay_deposit_capd']);
+
+    unset($_SESSION['pay_deposit_capd']);
+
+
+  }
+  else {
+    $result = heydesk_payment_pay_quickpay_callback($_SESSION['peyment_deposit_id']);
+    unset($_SESSION['peyment_deposit_id']);
+
+  }
+  if ($result) {
+    $desc = array(
+      'payment' => t('Card Transfer'),
+      'description' => t('Deposit'),
+    );
+    //    $desc_2 = array(
+    //      'payment' => t('Credit Card'),
+    //      'description' => t('Workspace Rental'),
+    //    );
+    //    $order_2 = heydesk_peyment_factoring($values['uid'], $_SESSION['price'], 9999999, $desc_2);
+
+
+    $query = db_select('heydesk_peyment_account', 'pa')
+      ->fields('pa', array('id'))
+      ->condition('pa.owner_id', $_SESSION['user_deposit'])
+      ->execute()
+      ->fetchCol();
+    //  dpm($query);
+
+    if (isset($query[0]) && ($query[0] == $_SESSION['user_deposit'])) {
+      $order = heydesk_peyment_factoring(0, $_SESSION['amount_daposit'], $_SESSION['user_deposit'], $desc, 'from bank');
+
+
+      //      $order = entity_load('heydesk_peyment_account', $query);
+      //
+      //      $order = $order[$_SESSION['user_deposit']];
+      //      $sum = $order->expanse;
+      //      $order->expanse = (int) $sum + (int) $_SESSION['amount_daposit'];
+      //      //    dpm($order->expanse);
+      //      $expanse = $order->expanse;
+      //
+      //      $order = entity_save('heydesk_peyment_account', $order);
+      //      if ($order) {
+      //        drupal_set_message(t('Your Deposite is OK'));
+      //        drupal_goto('user/'.$_SESSION['user_deposit'].'/balance');
+      //
+      //      }
+
+
+    }
+    else {
+
+      $value = array(
+        'id' => $_SESSION['user_deposit'],
+        'owner_id' => $_SESSION['user_deposit'],
+        'expanse' => $_SESSION['amount_daposit'],
+        'status' => 1,
+        'status_key' => 1
+      );
+      $order = entity_create('heydesk_peyment_account', $value);
+      $order = entity_save('heydesk_peyment_account', $order);
+      $expanse = $order->expanse;
+
+      if ($order) {
+
+        drupal_set_message(t('Your OK'));
+      }
+
+    }
+    //    $value = array(
+    //      'payer_uid' => ' ',
+    //      'payee_ius' => $_SESSION['user_deposit'],
+    //      'status' => 1,
+    //      'remittance' => $_SESSION['amount_daposit'],
+    //      'date' => time(),
+    //      'description' => t('Payment to '),
+    //      'payment' => t('Bank Transfer'),
+    //      'data' => $expanse,
+    //    );
+    //    $heydesk_peyment = entity_create('heydesk_peyment', $value);
+    //    $heydesk_peyment = entity_save('heydesk_peyment', $heydesk_peyment);
+  }
+  drupal_goto('user/' . $_SESSION['user_deposit'] . '/balance');
+
+
+}
+
+function heydesk_deposite_page($uid) {
+  $form_state = array(
+    'uid' => $uid,
+  );
+  $output = drupal_get_form('heydesk_deposite_page_form', $form_state);
+  return $output;
+}
+
+function heydesk_deposite_page_form($form, $form_state, $uid) {
+
+  $form['info'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Info Text')
+  );
+  $form['user'] = array(
+    '#type' => 'value',
+    '#value' => $uid
+  );
+  $form['sum'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Enter the amount of Deposit'),
+    '#size' => 7,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+    '#submit' => array('heydesk_deposite_page_form_submit'),
+
+  );
+  return $form;
+
+}
+
+function heydesk_deposite_page_form_submit($form, &$form_state) {
+  global $user;
+  $_SESSION['amount_daposit'] = $form_state['values']['sum'];
+  $_SESSION['user_deposit'] = $user->uid;
+  $_SESSION['price_all'] = $form_state['values']['sum'];
+
+  $user = user_load($user->uid);
+  $user_card = isset($user->field_quickpay_payments_id[LANGUAGE_NONE]) ? $user->field_quickpay_payments_id[LANGUAGE_NONE][0]['value'] : FALSE;
+  if ($user_card) {
+    $payment_link = heydesk_payment_link_deposit($user_card);
+  }
+  else {
+    $payment_link = heydesk_payment_link_deposit();
+
+  }
+
+  drupal_goto($payment_link);
+
+
+}
+
+function _heydesk_user_cash_account_create($uid, $sum = 0) {
+  $value = array(
+    'id' => $uid,
+    'owner_id' => $uid,
+    'expanse' => $sum,
+    'status' => 1,
+    'status_key' => 1
+  );
+  $account = entity_create('heydesk_peyment_account', $value);
+  $account = entity_save('heydesk_peyment_account', $account);
+  return $account ? TRUE : FALSE;
+
+
+}
+
+function heydesk_log_payment($out, $uid, $amount, $description = '', $payment = '') {
+
+  $options = array(
+    'payer_uid' => $out,
+    'payee_ius' => $uid,
+    'remittance' => $amount,
+    'status' => 1,
+    'date' => time(),
+    'description' => $description,
+    'payment' => $payment,
+    'data' => _heydesk_user_balance_get($uid),
+    'balance_payer' => _heydesk_user_balance_get($out),
+
+  );
+  $order = entity_create('heydesk_peyment', $options);
+  //  dpm($order);
+  $order = entity_save('heydesk_peyment', $order);
+  if ($order) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+
+}
+
+function _array_booking($uid) {
+  $bookings = db_select('heydesk_listing', 'hl')->fields('hl', array(
+    'date_from',
+    'price'
+  ))->condition('hl.uid', $uid)//    ->condition('hl.status', 1)
+  ->condition('hl.date_from', time() - 31536000, '>')->execute()->fetchAll();
+  $booking_mount[] = array();
+  foreach ($bookings as $booking) {
+    //    dpm( date('F', $rental->date_from));
+    $m = date('n', $booking->date_from);
+    $booking_mount[$m - 1][] = $booking->price;
+  }
+  return $booking_mount;
+}
+
+
+function _array_rentals($uid) {
+  $rentals = db_select('heydesk_listing', 'hl')->fields('hl', array(
+    'date_from',
+    'price'
+  ))->condition('hl.pid', $uid)//    ->condition('hl.status', 1)
+  ->condition('hl.date_from', time() - 31536000, '>')->execute()->fetchAll();
+  $rental_mount[] = array();
+  foreach ($rentals as $rental) {
+    //    dpm( date('F', $rental->date_fro m));
+    $m = date('n', $rental->date_from);
+    $rental_mount[$m - 1][] += $rental->price;
+  }
+  return $rental_mount;
+}
+
+function heydesk_earnings_list($user) {
+  $now = date('n');
+
+  $rentals = _array_rentals($user->uid);
+  $bookings = _array_booking($user->uid);
+
+
+  $output = '<h1>' . t('Earnings') . '</h1>';
+  $header = array('Month', 'Bookings', 'Rentals', 'Earnings');
+  $rows = array();
+  $mounts_array = array();
+
+
+  for ($i = 0; $i < 12; $i++) {
+    $mounts_array[$i] = date('F Y', mktime(0, 0, 0, $now - $i));
+
+
+  }
+  $amount = array();
+  $count_booking = array();
+  $count_rentals = array();
+  foreach ($mounts_array as $key => $mount) {
+    $amount[$key] = (isset($rentals[$key]) ? array_sum($rentals[$key]) : 0) - (isset($bookings[$key]) ? array_sum($bookings[$key]) : 0);
+    $count_booking[$key] = isset($bookings[$key]) ? count($bookings[$key]) : 0;
+    $count_rentals[$key] = isset($rentals[$key]) ? count($rentals[$key]) : 0;
+
+    $rows[] = array(
+      $mount,
+      $count_booking[$key],
+      $count_rentals[$key],
+      '$ ' . $amount[$key],
+
+    );
+
+  }
+  dpm($count_booking);
+
+
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  $table_1 = '<table class="total-12"><tr><td><div>';
+  $table_1 .= t('Total past 12 mouths');
+  $table_1 .= '</div></td><td><div>';
+  $table_1 .= array_sum($count_booking);
+  $table_1 .= '</div></td><td><div>';
+  $table_1 .= array_sum($count_rentals);
+  $table_1 .= '</div></td><td><div>';
+  $table_1 .= '$ ' . array_sum($amount);
+  $table_1 .= '</div></td></tr></table>';
+  $output .= $table_1;
+  $table_2 = '<table class="total-now"><tr><td><div>';
+  $table_2 .= t('Total since ') . date('d.m.Y');
+  $table_2 .= '</div></td><td><div>';
+  $table_2 .= '';
+  $table_2 .= '</div></td><td><div>';
+  $table_2 .= '';
+  $table_2 .= '</div></td><td><div>';
+  $table_2 .= '$ ' . array_sum($amount);
+  $table_2 .= '</div></td></tr></table>';
+  $output .= $table_2;
+
+
+  return $output;
+}
+
+
+function _booking_mount_count($mount, $user_uid) {
+  return TRUE;
+
+}
+
+function heydesk_peyment_check($user_id, $amount) {
+  $expanse = db_select('heydesk_peyment_account', 'ph')
+    ->fields('ph', array('expanse', 'id'))
+    ->condition('ph.owner_id', $user_id)
+    ->execute()
+    ->fetchAll();
+  dpm($expanse);
+  if ($expanse[0]->expanse > $amount) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+function heydesk_peyment_factoring($user_id, $amount, $recipient, $desc = array(), $operation_type = FALSE) {
+  if ($operation_type != 'from bank') {
+
+
+    $expanse = db_select('heydesk_peyment_account', 'ph')
+      ->fields('ph', array('expanse', 'id'))
+      ->condition('ph.owner_id', $user_id)
+      ->execute()
+      ->fetchAll();
+    //  dpm($expanse);
+
+    $user_account = entity_load('heydesk_peyment_account', array($expanse[0]->id));
+    $user_account[$expanse[0]->id]->expanse = (int) $expanse[0]->expanse - (int) $amount;
+    $user_account = entity_save('heydesk_peyment_account', $user_account[$expanse[0]->id]);
+  }
+  else {
+    $user_account = 1;
+    $user_id = 0;
+  }
+  $recipient_account = heydesk_peyment_account_load($recipient);
+  if (!$recipient_account) {
+    $recipient_account = _heydesk_user_cash_account_create($recipient, $amount);
+  }
+  else {
+    $recipient_account->expanse = (int) $recipient_account->expanse + (int) $amount;
+    $recipient_account = entity_save('heydesk_peyment_account', $recipient_account);
+  }
+  if (($user_account) || ($recipient_account)) {
+    return heydesk_log_payment($user_id, $recipient, $amount, $desc['description'], $desc['payment']);
+  }
+  else {
+    return FALSE;
+  }
+}
+
+function heydesk_not_enough_money_callback($uid) {
+
+  $form_state = array(
+    'title' => t('Example form'),
+    'ajax' => TRUE,
+    'values' => array(
+      'uid' => $uid,
+    ),
+  );
+
+  heydesk_ctools_popup_style();
+  $commands = ctools_modal_form_wrapper('heydesk_not_enough_money_form', $form_state);
+  //  return array('#type' => 'ajax', '#commands' => $commands);
+  return $commands;
+}
+
+function _heydesk_user_balance_get($uid) {
+  $query = db_select('heydesk_peyment_account', 'pa')
+    ->fields('pa', array('expanse'))
+    ->condition('pa.owner_id', $uid)
+    ->execute()
+    ->fetchField();
+  return $query;
+}
+
+//
+//function heydesk_cards_pay_form($form, $form_state) {
+//
+//  global $user;
+//  $user_wrapper = entity_metadata_wrapper('user', $user);
+//  $node_properties = $user_wrapper->getPropertyInfo();
+//  $zipcode = $user_wrapper->field_zip_code->value();
+//  $names = $user_wrapper->field_first_name->value() . ' ' . $user_wrapper->field_surname->value();
+//  $address = $user_wrapper->field_address->value();
+//  $city = $user_wrapper->field_sities->name->value();
+//
+//
+//  $form = array(
+//    '#method' => 'POST',
+//    '#action' => '/quickpay'
+//  );
+//  $form['#attributes'] = array(
+//    'class' => array('form-horizontal'),
+//    'id' => 'checkout-form'
+//  );
+//  $form['name'] = array(
+//    '#type' => 'value',
+//    '#value' => $names,
+//  );
+//  $form['address'] = array(
+//    '#type' => 'value',
+//    '#value' => $address,
+//  );
+//  $form['zipcode'] = array(
+//    '#type' => 'value',
+//    '#value' => $zipcode,
+//
+//  );
+//  $form['city'] = array(
+//    '#type' => 'value',
+//    '#value' => $city,
+//
+//  );
+//  $form_pay = ' <label>Card number</label>';
+//  $form_pay .= '<div class="card">';
+//  $form_pay .= ' <div class="card-brand"></div>';
+//  $form_pay .= '<input type="text" autocomplete="off" data-quickpay="cardnumber">';
+//  $form_pay .= ' </div>';
+//  $form_pay .= '<label>Expiration</label>';
+//  $form_pay .= '<input type="text" placeholder="MM / YY" autocomplete="off" data-quickpay="expiration">';
+//  $form_pay .= '<label>CVV/CVD</label>';
+//  $form_pay .= ' <input type="text" maxlength="4" autocomplete="off" data-quickpay="cvd">';
+//  //  $form_pay .= '  <button class="btn btn-primary" type="submit">Pay</button>';
+//  //  $form_pay .= '</form>';
+//  //  $form_pay .= '';
+//  $form['active_layot'] = array(
+//    '#type' => 'markup',
+//    '#markup' => $form_pay
+//  );
+//
+//
+//  //    $form['submit'] = array(
+//  //        '#type' => 'submit',
+//  //        '#value' => t('Card Pay'),
+//  //        //
+//  //        '#submit' => array('heydesk_cards_pay_form_submit'),
+//  //        //    '#ajax' => array(
+//  //        //
+//  //        //      'callback' => 'heydesk_pay_submit',
+//  //        //      'wrapper' => 'poll-choices',
+//  //        //      'method' => 'replace',
+//  //        //      'effect' => 'fade',
+//  //        //
+//  //        //    ),
+//  //        //    '#attributes' => array(
+//  //        //      'class' => array(
+//  //        //        'btn',
+//  //        //        'btn-primary',
+//  //        //        'ctools-use-modal',
+//  //        //        'ctools-modal-first-popup-style'
+//  //        //      ),
+//  //        //
+//  //        //    ),
+//  //        '#prefix' => '<div class="btn_border"><span>',
+//  //        '#suffix' => '</span></div>', //</div>',
+//  //    );
+//  $form['#attached']['js'] = array(
+//    'https://payment.quickpay.net/embedded/v1/quickpay.js' => array(
+//      'type' => 'external',
+//    )
+//  );
+//  $form['#attached']['js'] = array(drupal_get_path('module', 'heydesk_external_api') . '/quickpay/heydesk_pay.js');
+//
+//
+//  return $form;
+//}
+//
+//function heydesk_cards_pay_form_submit($form, &$form_state) {
+//
+//  $form_state['redirect'] = 'quickpay';
+//  drupal_goto('quickpay');
+//
+//}
+//
+
+//use QuickPay\QuickPay as Client;
+//use Model\Order;
+
+
+function heydesk_card_link() {
+  global $base_url;
+  $api_key = variable_get('heydesk_quickpay_key', '');
+  $client = new QuickPay(":{$api_key}");
+  $card = $client->request->post("/cards")->asObject();
+
+  $ammount = array(
+    //    'amount' => $amount,
+    //    'continue_url' => $base_url . '/user/' . $user->uid . '/booking-overview',
+    'continueurl' => $base_url . '/quickpay',
+    'callbackurl' => $base_url . '/quickpay',
+    'cancelurl' => $base_url . '/proposal-order/' . $_SESSION['proporal_rental_data']['nid'],
+    'branding_id' => 4479,
+    'framed' => TRUE
+    // Must be unique
+    //        'currency' => 'EUR'
+  );
+
+  $link = $client->request->put("/cards/{$card->id}/link", $ammount)
+    ->asObject();
+  $_SESSION['pay_link_type'] = array(
+    'card' => $card->id
+  );
+
+  return $link->url;
+
+
+}
+
+function heydesk_payment_link($card) {
+  global $base_url;
+  $api_key = variable_get('heydesk_quickpay_key', '');
+  $client = new QuickPay(":{$api_key}");
+
+  $site_order_id = rand(100000, 999999);
+
+  $order = array(
+    'order_id' => $site_order_id, // Must be unique
+    'currency' => 'USD'
+  );
+
+
+  $token = $client->request->post("/cards/{$card}/tokens")->asArray();
+
+  $peyment = $client->request->post('/payments', $order)->asObject();
+  $payment_id = $peyment->id;
+
+
+  //  $paement_client = array(
+  //    'amount' => $_SESSION['price_all'] * 100,
+  //    'card' => array(
+  //      'token' => $token['token']
+  //    ),
+  //  );
+
+  $link_array = array(
+    'amount' => $_SESSION['price_all'] * 100,
+    //    'continue_url' => $base_url . '/user/' . $user->uid . '/booking-overview',
+    'continue_url' => $base_url . '/quickpay',
+    'callback_url' => $base_url . '/quickpay',
+    'cancelurl' => $base_url . '/proposal-order/' . $_SESSION['proporal_rental_data']['nid'],
+    'reference_title' => t('Heydesk Rental'),
+    'branding_id' => 4479,
+    'framed' => TRUE
+    // Must be unique
+    //        'currency' => 'EUR'
+  );
+
+  $link = $client->request->put("/payments/{$payment_id}/link", $link_array)
+    ->asObject();
+  $_SESSION['peyment_id'] = $payment_id;
+
+
+  return $link->url;
+
+
+}
+
+function heydesk_payment_pay_quickpay_callback($payment_id) {
+  $api_key = variable_get('heydesk_quickpay_key', '');
+  $client = new QuickPay(":{$api_key}");
+  //  $paement_client = array(
+  //    'amount' => $_SESSION['price_all'] * 100,
+  //    'card' => array(
+  //      'token' => $token['token']
+  //    ),
+  //  );
+  $pay_ammount = array(
+    'amount' => $_SESSION['price_all'] * 100,
+  );
+
+  //  $peyment = $client->request->post("/payments/{$payment_id}/authorize?synchronized", $paement_client)->asObject();
+  $peyment = $client->request->post("/payments/{$payment_id}/capture?synchronized", $pay_ammount)
+    ->asObject();
+  return TRUE;
+
+}
+
+function heydesk_card_pay_quickpay_callback($card) {
+  global $user;
+  global $base_url;
+  $api_key = variable_get('heydesk_quickpay_key', '');
+  $client = new QuickPay(":{$api_key}");
+
+  //  $desc = array(
+  //    'payment' => t('Card Transfer'),
+  //    'description' => t('Payment to '),
+  //  );
+  //  //  $site_order_id = heydesk_peyment_factoring($user->uid,$amount,9999999, $desc);
+  //  $requst = drupal_get_query_parameters();
+  //    $peyment = $client->request->get('/payments/' . $payment_id)->asArray();
+  //  dpm($peyment);
+  $site_order_id = rand(100000, 999999);
+  $order = array(
+    'order_id' => $site_order_id, // Must be unique
+    'currency' => 'USD'
+  );
+
+
+  $token = $client->request->post("/cards/{$card}/tokens");
+
+  $peyment = $client->request->post('/payments', $order)->asObject();
+  $payment_id = $peyment->id;
+
+
+  $paement_client = array(
+    'amount' => $_SESSION['price_all'] * 100,
+    'card' => array(
+      'token' => $token
+    ),
+  );
+  $pay_ammount = array(
+    'amount' => $_SESSION['price_all'] * 100,
+  );
+
+  $peyment = $client->request->post("/payments/{$payment_id}/authorize?synchronized", $paement_client)
+    ->asObject();
+  dpm($peyment);
+  $peyment = $client->request->post("/payments/{$payment_id}/capture?synchronized", $pay_ammount)
+    ->asObject();
+  dpm($peyment);
+
+
+  //  $peyment = $client->request->post("/payments/{$payment_id}/cancel?synchronized")->asArray();
+
+
+  //  dpm($peyment);
+
+  //  dpm($peyment);
+
+
+  //  list($status_code, $headers, $response_body) = $client->request->get('/payments')
+  //    ->asRaw();
+  //    $payments = $client->request->get('/payments')->asArray();
+
+  //  drupal_goto($payment->url);
+
+
+  return $card;
+
+
+}
+
+function heydesk_post_pay_quickpay_callback() {
+
+
+  if (isset($_SESSION['pay_link_type']['card'])) {
+
+    $result = heydesk_card_pay_quickpay_callback($_SESSION['pay_link_type']['card']);
+
+
+  }
+  else {
+    $result = heydesk_payment_pay_quickpay_callback($_SESSION['peyment_id']);
+  }
+  if ($result) {
+    $desc = array(
+      'payment' => t('Card Transfer'),
+      'description' => t('Payment to '),
+    );
+    $desc_2 = array(
+      'payment' => t('Credit Card'),
+      'description' => t('Workspace Rental'),
+    );
+    $values = $_SESSION['proporal_rental_data']['listing_data'];
+    $order = heydesk_peyment_factoring(0, $_SESSION['price_all'], $values['uid'], $desc, 'from bank');
+    $order_2 = heydesk_peyment_factoring($values['uid'], $_SESSION['price'], 9999999, $desc_2);
+
+
+    $heydesk_listing = entity_create('heydesk_listing', $values);
+    $heydesk_listing = entity_save('heydesk_listing', $heydesk_listing);
+
+    if ($heydesk_listing) {
+      unset($_SESSION['form_step']);
+      unset($_SESSION['form_value']);
+      unset($_SESSION['pay_link_type']);
+      unset($_SESSION['peyment_id']);
+      unset($_SESSION['price_all']);
+      unset($_SESSION['price']);
+      unset($_SESSION['proporal_rental_data']);
+
+      drupal_set_message(t('You booking submit!'));
+      $user_proposal = user_load($values['pid']);
+      $user = user_load($values['uid']);
+
+
+      $mail_acsses = isset($user_proposal->field_receive_e_mail_with_activi['und'][0]['value']) ? $user_proposal->field_receive_e_mail_with_activi['und'][0]['value'] : 0;
+      if ($mail_acsses == 1) {
+        $mail = heydesk_mail_receive_mail_message($user_proposal, 'bookings');
+      }
+
+      if ($_SESSION['remember_cart'][1] == 1) {
+        $user->field_quickpay_payments_id[LANGUAGE_NONE][0]['value'] = $result;
+        $user = user_save($user);
+        unset($_SESSION['remember_cart']);
+
+
+      }
+      drupal_goto('user/' . $values['uid'] . '/booking-overview');
+
+
+    }
+
+
+  }
+  //
+  //  $api_key = variable_get('heydesk_quickpay_key', '');
+  //  $client = new QuickPay(":{$api_key}");
+  //  $card = $client->request->get("/cards")->asArray();
+  //  $card_id = $card[18]['id'];
+  //  $token = $client->request->post("/cards/{$card_id}/tokens")->asArray();
+  //
+  //  $payment = $client->request->post("/payments/{$callback}/session")->asArray();
+  //
+  //  $peyment = $client->request->get('/payments/' . $callback)->asArray();
+  //  dpm($peyment);
+  //  dpm($token);
+  return $result;
+
+}
+
+
+//function payment_start_form_submit($form, &$form_state) {
+//  heydesk_ctools_popup_style();
+//
+//
+//  $commands[] = ctools_ajax_command_redirect('user/'.$form_state['values']['uid'].'/deposit');
+//  print ajax_render($commands);
+//  exit;
+//
+//
+//}
+//function heydesk_quickpay_pay_callback(){
+//
+//}

@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_stars_rating_schema()
+{
+  $schema['heydesk_stars_rating'] = array(
+    'description' => t('Table for rating'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'uid'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('User ID of rating')),
+      'pid' => array('type' => 'int', 'length' => 8, 'not null' => TRUE, 'description' => t('ID proposal rating')),
+      'date' => array('type' => 'int', 'length' => 15, 'not null' => TRUE, 'description' => t('Rating date')),
+      'listing' => array('type' => 'int', 'length' => 6, 'not null' => TRUE, 'description' => t('Listing ID')),
+      'rating' => array('type' => 'char', 'length' => 1, 'not null' => TRUE, 'default' => '0', 'description' => t('rating')),
+    ),
+    'indexes' => array(
+      'rating' => array('rating')
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

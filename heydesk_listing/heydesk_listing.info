@@ -1,0 +1,9 @@
+name = Heydesk Listing
+description = Realisation listing system for Heydesk site
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_listing.module
+files[] = heydesk_listing.install
+
+dependencies[] = heydesk_custom_function
+dependencies[] = entity

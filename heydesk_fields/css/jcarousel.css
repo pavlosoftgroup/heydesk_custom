@@ -1,0 +1,238 @@
+.jcarousel-wrapper {
+	margin: 20px 0 40px 0;
+	position: relative;
+	border: none; /*10px solid #fff;*/
+	width: 915px;
+	height: 590px;
+	-webkit-border-radius: 5px;
+	-moz-border-radius: 5px;
+	border-radius: 5px;
+	/*-webkit-box-shadow: 0 0 2px #999;
+		 -moz-box-shadow: 0 0 2px #999;
+					box-shadow: 0 0 2px #999;*/
+}
+
+.jcarousel-wrapper .photo-credits {
+	position: absolute;
+	right: 15px;
+	bottom: 0;
+	font-size: 13px;
+	color: #FFFFFF;
+	text-shadow: 0 0 1px rgba(0, 0, 0, 0.85);
+	opacity: .66;
+}
+
+.jcarousel-wrapper .photo-credits a {
+	color: #FFFFFF;
+}
+
+/** Carousel **/
+
+.jcarousel {
+	position: relative;
+	overflow: hidden;
+}
+
+.jcarousel ul {
+	width: 20000em;
+	position: relative;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.jcarousel li {
+	float: left;
+	border-radius: 10px;
+}
+
+.jcarousel li > img {
+	border-radius: 10px;
+}
+
+/** Carousel Controls **/
+
+.jcarousel-control-prev,
+.jcarousel-control-next {
+	position: absolute;
+	top: 275px;
+	width: 40px;
+	height: 40px;
+	text-align: center;
+	background: #4E443C;
+	color: #FFFFFF;
+	opacity: 0.6;
+	text-decoration: none;
+	text-shadow: 0 0 1px #000000;
+	font: 24px/27px Arial, sans-serif;
+	-webkit-border-radius: 7px;
+	-moz-border-radius: 7px;
+	border-radius: 7px;
+	-webkit-box-shadow: 0 0 2px #999999;
+	-moz-box-shadow: 0 0 2px #999999;
+	box-shadow: 0 0 2px #999999;
+}
+
+.jcarousel-control-prev {
+	left: 10px;
+	font-size: 35px;
+	line-height: 0.9;
+	padding-right: 4px;
+}
+
+.jcarousel-control-next {
+	right: 10px;
+	font-size: 35px;
+	line-height: 0.9;
+	padding-left: 4px;
+}
+
+.jcarousel-control-prev:hover span,
+.jcarousel-control-next:hover span {
+	display: block;
+}
+
+.jcarousel-control-prev.inactive,
+.jcarousel-control-next.inactive {
+	opacity: .5;
+	cursor: default;
+}
+
+/** Carousel Pagination **/
+
+.jcarousel-pagination {
+	position: absolute;
+	bottom: 0;
+	left: 15px;
+}
+
+.jcarousel-pagination a {
+	text-decoration: none;
+	display: inline-block;
+	font-size: 18px;
+	font-weight: bolder;
+	line-height: 35px;
+	min-width: 40px;
+	background: #ECECEC;
+	color: #4E443C;
+	border-radius: 36px;
+	padding: 3px;
+	margin-left: 5px;
+	text-align: center;
+	margin-right: 2px;
+	opacity: .75;
+}
+
+.jcarousel-pagination a.active {
+	background: #4E443C;
+	color: #FFFFFF;
+	opacity: 1;
+	text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.75);
+}
+
+/*--------------------1600 px--------------*/
+@media (max-width: 1600px) {
+	.jcarousel-wrapper {
+		width: 100%;
+		height: auto;
+	}
+
+	.jcarousel li > img {
+		width: 573px;
+		height: 400px;
+	}
+
+	.jcarousel-control-prev, .jcarousel-control-next {
+		top: 180px;
+	}
+}
+
+/*---------------------------------------------------------*/
+@media (max-width: 1366px) {
+	.jcarousel-wrapper {
+		width: 100%;
+		height: auto;
+	}
+
+	.jcarousel-wrapper img {
+		width: 610px;
+		height: 393px;
+	}
+
+	.jcarousel-control-prev, .jcarousel-control-next {
+		top: 178px;
+	}
+}
+
+/*---------------------------------------------*/
+
+@media (max-width: 1200px) {
+
+	.jcarousel-wrapper {
+		width: 573px;
+		margin: 0 auto;
+		margin-bottom: 30px;
+	}
+
+}
+
+/*New Slider*/
+.slider-wrapper {
+	position: relative;
+	margin-bottom: 25px;
+	margin-top: 20px;
+}
+
+.slider-wrapper .slick-list {
+	border-radius: 8px;
+}
+
+.slider-wrapper .controll {
+	position: absolute;
+	top: 50%;
+	margin-top: -20px;
+	width: 40px;
+	height: 40px;
+	text-align: center;
+	border-radius: 7px;
+	cursor: pointer;
+	background: rgba(0, 0, 0, 0.75) url("../img/slider-arrow.svg") no-repeat center center;
+}
+
+.slider-wrapper .control-prev {
+	left: 10px;
+}
+
+.slider-wrapper .control-next {
+	right: 10px;
+	-webkit-transform: rotate(180deg);
+	-moz-transform: rotate(180deg);
+	-ms-transform: rotate(180deg);
+	-o-transform: rotate(180deg);
+	transform: rotate(180deg);
+}
+
+.slider-wrapper .slick-dots {
+	margin-bottom: 0;
+	position: absolute;
+	bottom: 10px;
+	left: 15px;
+}
+
+.slider-wrapper .slick-dots li {
+	display: inline-block;
+	margin-right: 5px;
+	background-color: rgba(255, 255, 255, 0.75);
+	color: #000000;
+	cursor: pointer;
+	width: 35px;
+	height: 35px;
+	text-align: center;
+	line-height: 35px;
+	border-radius: 50%;
+}
+
+.slider-wrapper .slick-dots li.slick-active {
+	background-color: rgba(0, 0, 0, 0.75);
+	color: #FFFFFF;
+}

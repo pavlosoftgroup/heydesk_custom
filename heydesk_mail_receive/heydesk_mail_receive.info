@@ -1,0 +1,6 @@
+name = Heydesk Mail Receive
+description = Realisation send mail receive.
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_mail_receive.module
+;files[] = heydesk_proposal_order.install

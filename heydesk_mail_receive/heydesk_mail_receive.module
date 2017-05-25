@@ -1,0 +1,543 @@
+<?php
+
+function heydesk_mail_receive_mail_message($user_mess, $options) {
+  $user_mess = user_load($user_mess->uid);
+  $site_email = variable_get('site_mail', '');
+
+  $user_fname = isset($user_mess->field_first_name[LANGUAGE_NONE][0]['value']) ? $user_mess->field_first_name[LANGUAGE_NONE][0]['value'] : '';
+  $user_name = isset($user_mess->field_surname[LANGUAGE_NONE][0]['value']) ? $user_mess->field_surname[LANGUAGE_NONE][0]['value'] : '';
+  $user_fullname = $user_name . ' ' . $user_fname;
+
+  switch ($options) {
+
+    case 'massage':
+
+
+      $send = drupal_mail('system', 'mail', $user_mess->mail, language_default(), array(
+        'context' => array(
+          'subject' => $site_email,
+          'message' => t('You received a message from a @name on the website @site', array(
+            '@name' => $user_fullname,
+            '@site' => variable_get('site_name', '')
+          )),
+        )
+      ));
+      if ($send) {
+        return TRUE;
+      }
+      else {
+        return FALSE;
+      }
+      break;
+    case 'bookings':
+      $send = drupal_mail('system', 'mail', $user_mess->mail, language_default(), array(
+        'context' => array(
+          'subject' => $site_email,
+          'message' => t('Someone booked your offer on the website @site', array(
+            //            '@name' => $user_fullname,
+            '@site' => variable_get('site_name', '')
+          )),
+        )
+      ));
+      if ($send) {
+        return TRUE;
+      }
+      else {
+        return FALSE;
+      }
+
+
+      break;
+
+
+  }
+
+
+  //  $to = $user_mess->mail;
+  //  $headers = t('You received a message from a @user on the website @site', array('@name' => $user_name, '@site' => variable_get('site_name', '')));
+  //  $message = $options['message'];
+  //  $sentmail = mail($to, $subject, $message, $headers);
+
+}
+
+//function heydesk_mail_receive_mail($key, &$message, $params) {
+//  if ($key == 'send_message') {
+//    $message['subject'] = 'Mail with attachment';
+//    $message['body'][] = 'Body...';
+//  }
+//}heydesk_mail_receive.info
+function heydesk_mail_receive_mail($key, &$message, $params) {
+  global $base_url;
+  //заголовки для HTML документа с кодировкой UFT-8
+  $message['headers']['Content-Type'] = 'text/html; charset=UTF-8';
+  //  $body = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\">\n";
+
+
+  switch ($key) {
+    case 'heydesk_mail_listing_booking_confirmation_negative':
+
+      $head = 'Hey, ' . $params['UserName'];
+
+      $body_1 = 'We are very sorry to say, that the host cancelled your request to work at ' . $params['listingName'];
+
+      $body_2 = ' Perhaps some other listings in the same area is <a href="' . $base_url . '/taxonomy/term/' . $params['listingCityId'] . '">interesting</a>';
+      $body = heydesk_mail_receive_theme_to_email($head, $body_1, $body_2);
+
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+
+      break;
+
+
+    case 'heydesk_mail_listing_booking_confirmation_positive_self':
+
+      $head = $params['sellerName'];
+
+
+      //      $body_1 = $params['sellerHost'];
+      $body_1 = 'You accepted the booking request from ' . $params['UserName'] . ' - and here’s the details for you: ';
+
+
+      $name = $params['listingName'];
+
+      $body_2 = 'PRICE: ' . $params['listingPrice'] . '$ ';
+      $body_3 = 'HEYDESK FEE: -15%';
+
+      $percent = (int) $params['listingPrice'] / 100;
+      $percent = $percent * 15;
+
+      $body_4 = 'TOTAL: ' . (int) $params['listingPrice'] - $percent . '$';
+
+
+      $body_5 = ' We look forward to an outstanding experience for both of you.';
+      $body = heydesk_mail_receive_theme_sendler_mail($head, $body_1, $body_2, $body_3, $body_4, $body_5, $name);
+
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+
+
+      break;
+
+    ///////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////
+    case 'heydesk_mail_listing_booking_confirmation_positive':
+
+
+      $host = l(t('Heydesk'), $base_url . '/user/' . $params['userId'] . '/booking-overview');
+
+
+      $head = 'Hey ' . $params['UserName'];
+
+      $body_1 = 'We are glad to inform you that your booking for ' . $params['sellerName'] . 'has been approved by the host, ' . $host;
+
+
+      $body_2 = 'The total price is ' . $params['listingPrice'] . '$';
+      $body_2 .= 'Please log in to your account to see the details.';
+      $body = heydesk_mail_receive_theme_to_email($head, $body_1, $body_2);
+
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+      break;
+
+
+    ////////////////////////////////////////
+    ///////////////////////////////////////
+    ///////////////////////////////////////
+
+
+    case 'heydesk_mail_listing_create_buyer':
+
+
+      $host = l(t('Heydek'), $base_url . '/user/' . $params['bayerId'] . '/booking-overview');
+
+      $head = 'Hey ' . $params['bayerName'];
+
+
+      $body_1 = 'Thank you for using Heydesk and booking a desk on your desired location.' . "\n";
+      $body_1 .= 'Please give the host,' . $host . ', some time to review your booking. You will receive an email when the host approves your booking.';
+
+
+      $body_2 = 'While you wait, check out some of the other locations and options available at Heydesk.';
+
+
+      $body = heydesk_mail_receive_theme_to_email($head, $body_1, $body_2);
+
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+      break;
+    case 'heydesk_mail_listing_create_seller':
+      $listing = heydesk_listing_load($params['bayer_id']);
+
+      //      $user = user_load($listing->uid);
+      //      $wrap_user = entity_metadata_wrapper('user', $user);
+      //      $username = $wrap_user->field_first_name->value() . ' ' . $wrap_user->field_surname->value();
+      //      $listing = node_load($listing->date);
+      //      $listing = $listing->title;
+      //      $seller = user_load($listing->pid);
+      $link = $base_url . '/user/' . $params['sellerId'] . '/listing-overview';
+      //      $heydesk_create = ;
+
+
+      $head = 'Hey ' . $params['sellerName'];
+      $body_1 = $params['bayerName'] . ' made a booking on your listing: ' . $params['listingName'] . ' Please review the booking here ' . $link;
+
+      $body_2 = 'You can also find details about the booking when you log into your Heydesk profile.';
+
+      $body = heydesk_mail_receive_theme_to_email($head, $body_1, $body_2);
+
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+
+
+      break;
+    ///////////////////////////////////////////////////////
+
+
+    case 'heydesk_mail_user_insert':
+      $host = l('Heydesk', $base_url . '/user/' . $params['user_id']);
+      $head = t('Hey ') . $params['bayer_name'];
+
+
+      $body_1 = 'Thank you for registering with Heydesk. We are devoted to helping you find awesome available office spaces around the world and we are hoping you will have an outstanding experience with us. ' . "\n";
+      $body_1 .= 'For your own safety, please keep your login credentials safe. Heydesk ensures that all of the information you share on our website is secure and encrypted. ';
+
+      $body_2 = 'Ready to go? ';
+      $body_2 .= 'Head on to ' . $host . ', and, check out the existing listings - or you can add your own! ' . "\n";
+      $body = heydesk_mail_receive_theme_to_email($head, $body_1, $body_2);
+
+      $message['subject'] = t('Heydesk Notification');
+      $message['body'][] = $body;
+
+
+      break;
+
+
+  }
+}
+
+//$type = 'heydesk_listing';
+//function heydesk_mail_receive_entity_insert($entity, $type) {
+//  $buyer = user_load($entity->uid);
+//  $seller = user_load($entity->pid);
+//  var_dump($seller);
+//  exit;
+//  $vars = array(
+//    'listing_id' => $entity->data,
+//  );
+//  $seller_mail = $seller->mail;
+//  $buyer_mail = $buyer->mail;
+//  $from = variable_get('site_mail', '');
+//
+//  drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_create_buyer', $buyer_mail, language_default(), $vars, $from);
+//  drupal_mail('heydesk_mail_receive', 'heydesk_mail_listing_create_seller', $seller_mail, language_default(), $vars, $from);
+
+//}
+
+
+function heydesk_mail_receive_user_insert(&$edit, $account, $category) {
+  //  $node = node_load($account->uid);
+  $user = user_load($account->uid);
+  $value = array(
+    'id' => $account->uid,
+    'owner_id' => $account->uid,
+    'expanse' => 0,
+    'status' => 1,
+    'status_key' => 1
+  );
+  $acc = entity_create('heydesk_peyment_account', $value);
+  $acc= entity_save('heydesk_peyment_account', $acc);
+
+  //  $wrapper = entity_metadata_wrapper('node', $node);
+  //  $wrap_user = entity_metadata_wrapper('user', $user);
+
+  //  dsm($wrap_user);
+  //  $vars =
+  $vars = array(
+    'bayer_name' => $user->field_first_name[LANGUAGE_NONE][0]['value'],
+    'user_id' => $account->uid,
+  );
+  //  $vars = array(
+  //    'listing_title' => $wrapper->title->value(),
+  //    'listing_name' => $wrapper->author->name->value(),
+  //    'listing_user' => $wrapper->author->mail->value(),
+  //    'user_id' => $wrap_user->uid->set(),
+  ////    'user_name' => $wrap_user->field_first_name->set() . ' ' . $wrap_user->field_surname->set(),
+  //  );
+  //  $mail = 'pavlo.softgroup@gmail.com';
+
+  $mail = $account->mail;
+  $from = variable_get('site_mail', '');
+
+
+  drupal_mail('heydesk_mail_receive', 'heydesk_mail_user_insert', $mail, language_default(), $vars, $from);
+
+
+}
+
+function heydesk_mail_receive_theme_sendler_mail($head, $body_1, $body_2, $body_3, $body_4, $body_5, $name) {
+
+  $body = '<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <title></title>
+  <!--[if !mso]><!-- -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--<![endif]-->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+  #outlook a { padding: 0; }
+  .ReadMsgBody { width: 100%; }
+  .ExternalClass { width: 100%; }
+  .ExternalClass * { line-height:100%; }
+  body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { border-collapse:collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+  p { display: block; margin: 13px 0; }
+</style>
+<!--[if !mso]><!-->
+<style type="text/css">
+  @media only screen and (max-width:480px) {
+    @-ms-viewport { width:320px; }
+    @viewport { width:320px; }
+  }
+</style>
+<!--<![endif]-->
+<!--[if mso]>
+<xml>
+  <o:OfficeDocumentSettings>
+    <o:AllowPNG/>
+    <o:PixelsPerInch>96</o:PixelsPerInch>
+  </o:OfficeDocumentSettings>
+</xml>
+<![endif]-->
+<!--[if lte mso 11]>
+<style type="text/css">
+  .outlook-group-fix {
+    width:100% !important;
+  }
+</style>
+<![endif]-->
+
+<!--[if !mso]><!-->
+    <link href="https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700" rel="stylesheet" type="text/css">
+    <style type="text/css">
+
+        @import url(https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700);
+
+    </style>
+  <!--<![endif]--><style type="text/css">
+  @media only screen and (min-width:480px) {
+    .mj-column-per-100 { width:100%!important; }
+  }
+</style>
+</head>
+<body>
+  <div><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#333;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#333;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="center"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-spacing:0px;" align="center" border="0"><tbody><tr><td style="width:200px;"><img alt="" title="" height="auto" src="http://heydesk.com/sites/all/themes/heydesk/images/logo.png" style="border:none;border-radius:;display:block;outline:none;text-decoration:none;width:100%;height:auto;" width="200"></td></tr></tbody></table></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#fff;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#fff;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="center"><div class="" style="cursor:auto;color:#333;font-family:Dosis;font-size:28px;font-weight:800;line-height:22px;text-align:center;">Hey ' . $head . ' </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#fff;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#fff;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">' . $body_1 . '</div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">' . $name . ' </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">' . $body_2 . '</div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">' . $body_3 . ' </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">
+                 <p style="width:200px; border-top:1px solid #333;"></p>
+                 ' . $body_4 . ' </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">' . $body_5 . ' </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#333;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#333;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:0px 0px 10px 0px;"><p style="font-size:1px;margin:0px auto;border-top:4px solid red;width:100%;"></p><!--[if mso | IE]><table role="presentation" align="center" border="0" cellpadding="0" cellspacing="0" style="font-size:1px;margin:0px auto;border-top:4px solid red;width:100%;" width="600"><tr><td style="height:0;line-height:0;"> </td></tr></table><![endif]--></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:0px 25px;" align="left"><div class="" style="cursor:auto;color:#fff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:22px;text-align:left;">Kind Regards,  </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:0px 25px;" align="left"><div class="" style="cursor:auto;color:#fff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:22px;text-align:left;">The Heydesk Team </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></div>
+</body>
+</html>';
+
+  return $body;
+}
+
+function heydesk_mail_receive_theme_to_email($head, $body_1, $body_2) {
+
+  $body = '<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <title></title>
+  <!--[if !mso]><!-- -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--<![endif]-->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+  #outlook a { padding: 0; }
+  .ReadMsgBody { width: 100%; }
+  .ExternalClass { width: 100%; }
+  .ExternalClass * { line-height:100%; }
+  body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { border-collapse:collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+  p { display: block; margin: 13px 0; height: 4px; background: -webkit-linear-gradient(right, #FF893F 0%, #FF0B5C 100%);
+    background: linear-gradient(to left, #FF893F 0%, #FF0B5C 100%); }
+</style>
+<!--[if !mso]><!-->
+<style type="text/css">
+  @media only screen and (max-width:480px) {
+    @-ms-viewport { width:320px; }
+    @viewport { width:320px; }
+  }
+</style>
+<!--<![endif]-->
+<!--[if mso]>
+<xml>
+  <o:OfficeDocumentSettings>
+    <o:AllowPNG/>
+    <o:PixelsPerInch>96</o:PixelsPerInch>
+  </o:OfficeDocumentSettings>
+</xml>
+<![endif]-->
+<!--[if lte mso 11]>
+<style type="text/css">
+  .outlook-group-fix {
+    width:100% !important;
+  }
+</style>
+<![endif]-->
+
+<!--[if !mso]><!-->
+    <link href="https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700" rel="stylesheet" type="text/css">
+    <style type="text/css">
+
+        @import url(https://fonts.googleapis.com/css?family=Ubuntu:300,400,500,700);
+
+    </style>
+  <!--<![endif]--><style type="text/css">
+  @media only screen and (min-width:480px) {
+    .mj-column-per-100 { width:100%!important; }
+  }
+</style>
+</head>
+<body>';
+
+  $body .= '  <div><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#333;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#333;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="center"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-spacing:0px;" align="center" border="0"><tbody><tr><td style="width:200px;"><img alt="" title="" height="auto" src="http://heydesk.com/sites/all/themes/heydesk/images/logo.png" style="border:none;border-radius:;display:block;outline:none;text-decoration:none;width:100%;height:auto;" width="200"></td></tr></tbody></table></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#fff;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#fff;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="center"><div class="" style="cursor:auto;color:#333;font-family:Dosis;font-size:28px;font-weight:800;line-height:22px;text-align:center;">';
+  $body .= $head;
+
+  $body .= ' </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#fff;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#fff;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">';
+  $body .= $body_1;
+  $body .= '  </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">
+     </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">';
+  $body .= '  </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">
+     </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:10px 25px;" align="left"><div class="" style="cursor:auto;color:#000000;font-family:Dosis;font-size:16px;line-height:22px;text-align:left;">';
+
+
+  $body .= $body_2;
+
+
+  $body .= '   </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]-->
+      <!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center" style="width:600px;">
+        <tr>
+          <td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;">
+      <![endif]--><div style="margin:0px auto;max-width:600px;background:#333;"><table role="presentation" cellpadding="0" cellspacing="0" style="font-size:0px;width:100%;background:#333;" align="center" border="0"><tbody><tr><td style="text-align:center;vertical-align:top;direction:ltr;font-size:0px;padding:20px 0px;"><!--[if mso | IE]>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;width:600px;">
+      <![endif]--><div class="mj-column-per-100 outlook-group-fix" style="vertical-align:top;display:inline-block;direction:ltr;font-size:13px;text-align:left;width:100%;"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0"><tbody><tr><td style="word-break:break-word;font-size:0px;padding:0px 0px 10px 0px;"><p style="font-size:1px;margin:0px auto; width:100%;"></p><!--[if mso | IE]><table role="presentation" align="center" border="0" cellpadding="0" cellspacing="0" style="font-size:1px;margin:0px auto;border-top:4px solid red;width:100%;" width="600"><tr><td style="height:0;line-height:0;"> </td></tr></table><![endif]--></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:0px 25px;" align="left"><div class="" style="cursor:auto;color:#fff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:22px;text-align:left;">Kind Regards,  </div></td></tr><tr><td style="word-break:break-word;font-size:0px;padding:0px 25px;" align="left"><div class="" style="cursor:auto;color:#fff;font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:22px;text-align:left;">The Heydesk Team </div></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></td></tr></tbody></table></div><!--[if mso | IE]>
+      </td></tr></table>
+      <![endif]--></div>
+</body>
+</html>
+';
+  return $body;
+
+
+}
+
+//function heydesk_mail_reactions_to_event($nid, $user, $event) {
+//  global $language;
+//
+//
+//  $from = variable_get('site_mail', '');
+//  // tokens
+////  $vars = array(
+////    'heydesk_mail_receive' => array(
+////      'listing_title' => $wrapper->title->value(),
+////      'listing_name' => $wrapper->author->field_first_name->value(),
+////      'listing_user' => $wrapper->author->mail->value(),
+////      'mail_recipient' => $wrap_user->field_first_name->value() . ' ' . $wrap_user->field_surname->value(),
+////    ),
+////  );
+//  // load template by name: "pharmstat_common_pharmstat_common_project_active_manufacturer"
+//  _mail_edit_module_load_include('alter.inc');
+//  $mail_template = _mail_edit_load('heydesk_mail_receive_booking', $language->language);
+//  if (($mail_template != NULL)) {
+//    drupal_mail('heydesk_mail_receive', 'heydesk_mail_receive_booking', $mail, $language, $vars, $from);
+//  }
+//  else {
+//    watchdog('Mail', 'Cannot send email.');
+//  }
+
+
+//}

@@ -1,0 +1,8 @@
+name = Heydesk Custom
+description = Realisation Heydesk custom function
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_custom_function.module
+
+;dependencies[] = heydesk_right_prop
+;files[] = heydesk_custom_function.install

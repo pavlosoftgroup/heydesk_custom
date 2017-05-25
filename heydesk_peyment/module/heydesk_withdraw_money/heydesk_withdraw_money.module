@@ -1,0 +1,242 @@
+<?php
+
+function heydesk_withdraw_money_entity_info() {
+  return array(
+    'heydesk_withdraw_money' => array(
+      'label' => t('Withdraw Money'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'views controller class' => 'EntityDefaultViewsController',
+      'base table' => 'heydesk_withdraw_money',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      //    'admin ui' => array(
+      //      'path' => 'admin/config/heydesk/messenger'
+      //    ),
+      'access callback' => 'heydesk_withdraw_money_access',
+      'module' => 'heydesk_withdraw_money',
+    ),
+  );
+}
+
+function heydesk_withdraw_money_menu() {
+  $items['user/%/withdraw-money/%'] = array(
+    'title' => t('Withdraw Money'),
+    'description' => t('Withdraw Money'),
+    'page callback' => 'heydesk_withdraw_money_callback',
+    'page arguments' => array(1, 3),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['withdraw-money/%/status/%'] = array(
+    'title' => t('Change Withdraw Money Status'),
+    'description' => t('Withdraw Money'),
+    'page callback' => 'heydesk_withdraw_money_status_callback',
+    'page arguments' => array(1, 3),
+    'access arguments' => array('heydesk administrator'),
+    'type' => MENU_CALLBACK,
+//    'delivery callback' => 'ajax_deliver',
+  );
+  $items['withdraw-money/%/status-change/%/%ctools_js'] = array(
+    'title' => t('Withdraw Money Status'),
+    'description' => t('Withdraw Money Status'),
+    'page callback' => 'heydesk_withdraw_money_change_status_callback',
+    'page arguments' => array(1, 3, 4),
+    'access arguments' => array('heydesk administrator'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['admin/config/administration/heydesk/withdraw-money'] = array(
+    'title' => t('Withdraw Money'),
+    'description' => t('Applications for withdrawal of money'),
+    'page callback' => 'heydesk_withdraw_money_admin',
+    //    'page arguments' => array(1, 3),
+    'access arguments' => array('heydesk administrator'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+function heydesk_withdraw_money_change_status_callback($id, $status, $js = NULL) {
+  $entity = entity_load('heydesk_withdraw_money', array($id));
+  $entity = $entity[0];
+  $entity->status = $status;
+  $entity = entity_save('heydesk_withdraw_money', $entity);
+  $commands = array();
+  $selector = 'tr.withdraw-' . $id;
+
+
+  $commands[] = ajax_command_remove($selector);
+  $commands[] = ctools_modal_command_dismiss();
+  print ajax_render($commands);
+  exit;
+
+
+}
+
+function heydesk_withdraw_money_status_callback($id, $js = NULL) {
+  $html = l(t('Completed'), 'withdraw-money/' . $id . '/status-change/2/nojs', array(
+    'attributes' => array(
+      'class' => array(
+        'complete-button',
+        'button',
+        'ctools-use-modal',
+//        'ctools-modal-modal-popup-small',
+      ),
+    ),
+  ));
+  $html .= l(t('Reject'), 'withdraw-money/' . $id . '/status-change/1/nojs', array(
+    'attributes' => array(
+      'class' => array(
+        'reject-button',
+        'button',
+        'ctools-use-modal',
+        'ctools-modal-modal-popup-small',
+      ),
+    ),
+  ));
+  if (!$js) {
+    return $html;
+  }
+    $form_state = array(
+      'ajax' => TRUE,
+    );
+
+//  $output = ctools_modal_command_display(t('Change Withdraw Money Status'), $html);
+  $output = ctools_modal_form_wrapper('heydesk_withdraw_money_form', $form_state);
+
+  print ajax_render($output);
+  drupal_exit();
+}
+
+function heydesk_withdraw_money_admin() {
+  //  $query = db_select('heydesk_withdraw_money', 'wm')
+  //    ->fie
+  heydesk_ctools_popup_style();
+
+  $heydesk_withdraw_money = entity_load('heydesk_withdraw_money');
+  dpm($heydesk_withdraw_money);
+
+  $header = array(
+    t('Date'),
+    t('User'),
+    t('Amount'),
+    t('Card'),
+    t('Action'),
+  );
+  $rows = array();
+  foreach ($heydesk_withdraw_money as $entity) {
+    $user = user_load($entity->uid);
+    $user_link = l($user->name, 'user/' . $entity->uid);
+    $action_link = l(t('To change status'), 'withdraw-money/' . $entity->id . '/status/nojs', array(
+      'attributes' => array(
+        'class' => array(
+          'use-ajax',
+          'ctools-use-modal',
+          'ctools-modal-modal-popup-small',
+        ),
+      ),
+    ));
+    if ($entity->status == 0) {
+      $rows[] = array(
+        'data' => array(
+          date('m-d-Y H:i', $entity->date),
+          $user_link,
+          $entity->amount . ' $',
+          $entity->data,
+          $action_link
+        ),
+        'class' => array('withdraw-' . $entity->id),
+      );
+    }
+  }
+  $output = theme('table', array(
+    'header' => $header,
+    'rows' => $rows,
+    'empty' => t('Table is empty', array()),
+  ));
+  return $output;
+
+}
+
+function heydesk_withdraw_money_callback($uid, $js = NULL) {
+  if (!$js) {
+    return drupal_get_form('heydesk_withdraw_money_form');
+  }
+  $form_state = array(
+    'ajax' => TRUE,
+    'uid' => $uid
+  );
+
+  $output = ctools_modal_form_wrapper('heydesk_withdraw_money_form', $form_state);
+
+  print ajax_render($output);
+  drupal_exit();
+
+}
+
+function heydesk_withdraw_money_form($form, $form_state) {
+  $form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Withdrawal: $'),
+    '#size' => 6,
+    '#maxlength' => 6,
+  );
+  $form['card'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Your Card:'),
+    '#size' => 16,
+    '#maxlength' => 19,
+    '#attributes' => array(
+      'class' => array(
+        'card-field'
+      ),
+    ),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Withdrawal'),
+    '#ajax' => array(
+      'callback' => 'heydesk_withdraw_money_form_ajax_submit'
+    ),
+  );
+  $form['#attached']['js'] = array(drupal_get_path('module', 'heydesk_withdraw_money') . '/js/heydesk_withdraw_money.js');
+
+  return $form;
+
+}
+
+function heydesk_withdraw_money_form_ajax_submit($form, &$form_state) {
+  $value = $form_state['values'];
+  $values = array(
+    'date' => time(),
+    'date_end' => 0,
+    'amount' => $value['amount'],
+    'uid' => $form_state['uid'],
+    'data' => $value['card'],
+  );
+  $heydesk_withdraw_money = entity_create('heydesk_withdraw_money', $values);
+  $heydesk_withdraw_money = entity_save('heydesk_withdraw_money', $heydesk_withdraw_money);
+
+
+  $form_state = array(
+    'title' => t('Example form'),
+    'ajax' => TRUE,
+    'values' => array(
+      'first_fоrm_values' => $values,
+      // Сохраняем данные из первой формы, чтобы иметь доступ к ним из второй формы.
+    ),
+  );
+  $popup_content = t('text');
+
+  // Подключаем необходимые библиотеки
+  ctools_include('modal');
+  ctools_include('ajax');
+
+  $commands = array();
+  $commands[] = ctools_modal_command_display(t('Withdrawal'), $popup_content);
+  return array('#type' => 'ajax', '#commands' => $commands);
+}

@@ -1,0 +1,235 @@
+textarea {
+	resize: none;
+	border: 1px solid #333333;
+	height: 212px;
+}
+
+.group-middle label {
+	font-size: 18px;
+	font-weight: normal;
+}
+
+#proposal-node-form .form-block-title,
+#edit-field-amenities-all-amenities-container label {
+	font-size: 25px;
+	margin-bottom: 16px;
+}
+
+#edit-field-location-description {
+	margin-top: 48px;
+}
+
+#edit-field-ametities-description {
+	margin-top: 325px;
+}
+
+#edit-field-amenities-all {
+	position: relative;
+}
+
+#edit-field-amenities-all .form-item-field-amenities-all-und {
+	position: absolute;
+	width: 360px;
+	height: 240px;
+	top: 0;
+	left: 50%;
+	font-size: 0;
+	background-color: #FFFFFF;
+	padding: 20px;
+	border: 1px solid #333333;
+	border-radius: 8px;
+	display: none;
+	z-index: 5;
+}
+
+#edit-field-amenities-all-und > div {
+	display: inline-block;
+	width: 50%;
+	margin-bottom: 10px;
+}
+
+#edit-field-days-of-the-week-und > div input[type="checkbox"],
+#edit-field-amenities-all-und > div input[type="checkbox"] {
+	display: none;
+}
+
+#edit-field-days-of-the-week-und > div input[type="checkbox"] + label,
+#edit-field-amenities-all-und > div input[type="checkbox"] + label {
+	line-height: 20px;
+	cursor: pointer;
+}
+
+#edit-field-days-of-the-week-und > div input[type="checkbox"] + label::before,
+#edit-field-amenities-all-und > div input[type="checkbox"] + label::before {
+	display: inline-block;
+	content: '';
+	background-image: url(/sites/all/themes/heydesk/images/small_check_uncheck.png);
+	width: 18px;
+	height: 18px;
+	background-size: 18px 38px;
+	background-position: 0px -20px;
+	background-repeat: no-repeat;
+	vertical-align: super;
+	background-position: 0 -20.5px;
+	vertical-align: baseline;
+	margin-right: 10px;
+}
+
+#edit-field-days-of-the-week-und > div input[type="checkbox"]:checked + label::before,
+#edit-field-amenities-all-und > div input[type="checkbox"]:checked + label::before {
+	background-position: 0 0;
+}
+
+#edit-field-amenities-all .button {
+	width: 110px;
+	height: 33px;
+	position: absolute;
+	bottom: 20px;
+}
+
+#edit-field-amenities-all .button > a {
+	height: 25px;
+	line-height: 22px;
+	font-size: 20px;
+	width: 100px;
+}
+
+#edit-field-amenities-all-amenities-container-amenities-list {
+	font-size: 18px;
+	margin-bottom: 5px;
+}
+
+.add-edit-amenities-buttons span {
+	font-size: 18px;
+	cursor: pointer;
+	display: inline-block;
+}
+
+.add-edit-amenities-buttons.add-opened span:first-child,
+.add-edit-amenities-buttons span:last-child {
+	display: none;
+}
+
+.add-edit-amenities-buttons span:first-child,
+.add-edit-amenities-buttons.add-opened span:last-child {
+	display: inline-block;
+}
+
+#edit-field-amenities-charge- input[type=submit] {
+	color: #000000;
+	font-size: 18px;
+	width: initial;
+	margin: 0 0 1em;
+	height: initial;
+}
+
+#edit-field-amenities-charge- input[type="text"] {
+	border-radius: 6px;
+	border: 1px solid #333333;
+	height: 40px;
+	display: block;
+}
+
+#edit-field-amenities-charge- label {
+	font-size: 18px;
+}
+
+#edit-field-amenities-charge- .field-multiple-drag {
+	display: none;
+}
+
+#edit-field-amenities-charge- .group-left,
+#edit-field-amenities-charge- .group-right {
+	margin: 0;
+}
+
+#edit-field-amenities-charge- table,
+#edit-field-amenities-charge- tbody,
+#edit-field-amenities-charge- th,
+#edit-field-amenities-charge- tr {
+	border: 0;
+	background: transparent;
+}
+
+#edit-field-amenities-charge- td {
+	width: 100%;
+}
+
+#edit-field-amenities-charge- .field-widget-text-textfield {
+	margin-bottom: 1em;
+}
+
+/**
+ * Proposal photos
+ */
+#edit-field-photos-photos-container {
+	background: #EDEDED;
+	border-radius: 8px;
+	padding: 30px 30px 20px 30px;
+}
+
+#field-photos-proposal-button {
+	background: #FFFFFF;
+	border: 1px solid #333333;
+	border-radius: 8px;
+	text-align: center;
+	font-size: 18px;
+	padding: 15px 20px;
+	margin-bottom: 70px;
+}
+
+#field-photos-proposal-button .upload-icon {
+	background: url('../images/upload_icon.svg') no-repeat center center;
+	background-size: auto 25px;
+	height: 45px;
+}
+
+#edit-field-photos .sticky-table {
+	display: table;
+}
+
+#edit-field-photos > div:first-child {
+	display: none !important;
+}
+
+.image-widget-data span {
+	display: none;
+}
+
+#preview-photo-list {
+	display: flex;
+	justify-content: space-between;
+	flex-wrap: wrap;
+}
+
+#preview-photo-list .proposal-photo-item {
+	background: #CCCCCC;
+	width: 100px;
+	height: 100px;
+	margin-bottom: 20px;
+	border-radius: 8px;
+	position: relative;
+	overflow: hidden;
+}
+
+#preview-photo-list .proposal-photo-item img {
+	position: absolute;
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+#preview-photo-list .proposal-photo-item i {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	display: none;
+	cursor: pointer;
+	line-height: 15px;
+	width: 15px;
+	text-align: center;
+}
+
+#preview-photo-list .proposal-photo-item:hover i {
+	display: block;
+}

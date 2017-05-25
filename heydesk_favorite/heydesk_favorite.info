@@ -1,0 +1,8 @@
+name = Heydesk favorite
+description = Realisation favirutes sysytem
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_favorite.module
+files[] = heydesk_favorite.install
+
+dependencies[] = entity

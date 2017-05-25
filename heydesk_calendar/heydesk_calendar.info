@@ -1,0 +1,9 @@
+name = Heydesk Calendar for Proposal Order
+description = Realisation calendar for order proposal
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_calendar.module
+files[] = heydesk_calendar.install
+
+;dependencies[] = heydesk_custom_function
+;dependencies[] = heydesk_right_prop

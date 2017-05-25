@@ -1,0 +1,1554 @@
+<?php
+drupal_load('module', 'heydesk_custom_function');
+module_load_include('inc', 'node', 'node.pages');
+module_load_include('inc', 'heydesk_user', 'includes/heydesk_user.block');
+module_load_include('inc', 'heydesk_user', 'includes/heydesk_user.features.block');
+module_load_include('inc', 'heydesk_user', 'ctools/heydesk_user_ctools');
+module_load_include('inc', 'heydesk_user', 'includes/heydesk_user.func');
+
+
+function heydesk_user_init() {
+
+
+  drupal_add_js(drupal_get_path('module', 'heydesk_user') . '/js/freshslider.1.0.0.js');
+  drupal_add_js(drupal_get_path('module', 'heydesk_user') . '/js/script.js');
+  // drupal_add_css(drupal_get_path('module', 'heydesk_user').'/css/style.css');
+  // drupal_add_js(drupal_get_path('module', 'heydesk_user') . '/js/libked-in.j)');
+
+
+}
+
+function _heydesk_ctools_include_modal() {
+
+  static $added = FALSE;
+  if ($added == FALSE) {
+    $added = TRUE;
+
+    // Include the CTools tools that we need.
+    ctools_include('modal');
+    ctools_include('ajax');
+    ctools_modal_add_js();
+
+    $heydesk_ctools_style = array(
+      'heydesk_ctools-contact-style' => array(
+        'modalSize' => array(
+          'type' => 'fixed',
+          'width' => 420,
+          'height' => 'auto',
+        ),
+        'modalOptions' => array(
+          'opacity' => (float) 0.3, // Прозрачность фона.
+          'background-color' => '#000000', // Цвет фона.
+        ),
+        'closeText' => '',
+        'loadingText' => '',
+        'animation' => 'fadeIn',
+        'animationSpeed' => 'fast',
+      ),
+    );
+
+    // Подключаем настройки для модального окна.
+    drupal_add_js($heydesk_ctools_style, 'setting');
+  }
+}
+
+
+//include(drupal_get_path('heydesk_custom_function'));
+/**
+ * Implement hook_permission()
+ */
+function heydesk_user_permission() {
+  return array(
+    'heydesk user' => array(
+      'title' => t('Administer Heydesk User'),
+      'description' => t('Perform user account.'),
+    ),
+    'heydesk administrator' => array(
+      'title' => t('Heydesk Super Administrator'),
+      'description' => t('Perform administrative site.'),
+    ),
+  );
+}
+
+/**
+ * Implement hook_menu()
+ */
+function heydesk_user_menu() {
+  $items['user/%user/profile'] = array(
+    'title' => 'Profile',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_user_users_profile_form', 1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/setting'] = array(
+    'title' => 'Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_user_setting_profile_form', 1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/manage-listing'] = array(
+    'title' => 'Manage Listing',
+    'page callback' => 'heydesk_manage_listing_list',
+    'page arguments' => array(1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/listing-overview'] = array(
+    'title' => 'Listings Overview',
+    'page callback' => 'heydesk_listing_overview_list',
+    'page arguments' => array(1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/booking-overview'] = array(
+    'title' => 'Booking Overview',
+    'page callback' => 'heydesk_booking_overview_list',
+    'page arguments' => array(1),
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/manage-listing/prices/%'] = array(
+    'title' => t('Price'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_proposal_prices_form', 1, 4),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/manage-listing/setting/%'] = array(
+    'title' => t('Settings'),
+    'description' => t('All messages of user.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_proposal_setting_form', 1, 4),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/add-proposal'] = array(
+    'title' => t('Add Proposal'),
+    'description' => t('Add proposal.'),
+    'page callback' => 'node_add',
+    'page arguments' => array('proposal', 1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['invite/%'] = array(
+    'title' => t('Invite'),
+    'description' => t('Invite'),
+    'page callback' => 'heydesk_invite_page',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/node-edit/%node'] = array(
+    'title' => t('Edit Proposal'),
+    'description' => t('Edit proposal.'),
+    'page callback' => 'proposal_node_page_edit',
+    'page arguments' => array(3),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/balance'] = array(
+    'title' => t('Balance'),
+    'description' => t('User Balance'),
+    'page callback' => 'heydesk_balance_list',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/earnings'] = array(
+    'title' => t('Earnings'),
+    'description' => t('User Earnings'),
+    'page callback' => 'heydesk_earnings_list',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/verifications'] = array(
+    'title' => t('Verifications'),
+    'description' => t('User Verifications account'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_user_verification_form', 1),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['user/%user/%'] = array(
+    'title' => t('Verifications'),
+    'description' => t('User Verifiti account'),
+    'page callback' => 'heydesk_admin_delete_entity',
+    'page arguments' => array(1, 2),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk user'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['delete/%/%/%ctools_js'] = array(
+    'title' => 'Get content by AJAX',
+    'page callback' => 'heydesk_admin_delete_entity_callback',
+    'page arguments' => array(1, 2, 3),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['system-massage/%/%ctools_js'] = array(
+    'title' => 'Get content by AJAX',
+    'page callback' => 'heydesk_system_massage_callback',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['facebook'] = array(
+    'title' => 'Facebook Log in',
+    'page callback' => 'heydesk_facebook_login_callback',
+    'page arguments' => array(TRUE),
+    'access arguments' => array(),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    // 'delivery callback' => 'ajax_deliver',
+  );
+  $items['invite/send/%/%/%ctools_js'] = array(
+    'title' => 'Facebook Log in',
+    'page callback' => 'heydesk_invite_ajax_callback',
+    'page arguments' => array(2, 3, 4),
+    'access arguments' => array('heydesk user'),
+    //    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['oauth2'] = array(
+    'title' => 'Google Mail',
+    'page callback' => 'heydesk_gmail_callback',
+    'page arguments' => array(TRUE),
+    'access arguments' => array(),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    // 'delivery callback' => 'ajax_deliver',
+  );
+  //  $items['pay/%'] = array(
+  //    'title' => t('Proposal Order'),
+  //    'description' => t('External API Setting. Enter key to connect external API.'),
+  //    'page callback' => 'heydesk_paying_callback',
+  //    'page arguments' => array(1),
+  //    'access arguments' => array('heydesk user'),
+  //    'type' => MENU_CALLBACK,
+  //    'delivery callback' => 'ajax_deliver',
+  //
+  //  );
+  $items['linkedin'] = array(
+    'title' => 'Linked In Log in',
+    'page callback' => 'heydesk_linkedin_login_callback',
+    'page arguments' => array(TRUE),
+    'access arguments' => array(),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    // 'delivery callback' => 'ajax_deliver',
+  );
+  $items['validator/%ctools_js/mobile'] = array(
+    'title' => t('Verification'),
+    'page callback' => 'heydesk_ctools_validator_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+  );
+  $items['validator/%user/facebook'] = array(
+    'title' => t('Facebook validation'),
+    'page callback' => 'heydesk_facebook_validator_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+  );
+  $items['share/facebook/$ctools_js/%proposal'] = array(
+    'title' => t('Facebook validation'),
+    'page callback' => 'heydesk_facebook_share_callback',
+    'page arguments' => array(2, 3),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    //    'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/favorites'] = array(
+    'title' => t('Favourites'),
+    'page callback' => 'heydesk_favorite_item_list',
+    'page arguments' => array(1),
+    //    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['boosting/%/%ctools_js'] = array(
+    'title' => t('Boosting Start'),
+    'page callback' => 'heydesk_bossting_start_ajax_callback',
+    'page arguments' => array(1, 2),
+    //    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'menu-profile'
+  );
+  $items['proposal/%/favorite/%/%ctools_js'] = array(
+    'title' => t('Favorites ajax'),
+    'page callback' => 'heydesk_favorite_page_callback',
+    'page arguments' => array(1, 3),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    //  'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+
+  );
+  $items['user/%/favorite/%/%'] = array(
+    'title' => t('Favorites remove'),
+    'page callback' => 'heydesk_favorite_remove_callback',
+    'page arguments' => array(1, 3, 4),
+    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'delivery callback' => 'ajax_deliver',
+    //  'theme callback' => 'ajax_base_page_theme',
+    'type' => MENU_CALLBACK,
+
+  );
+
+
+  return $items;
+}
+
+function heydesk_invite_page($invite) {
+  drupal_goto('/');
+
+}
+
+function proposal_node_page_edit($node) {
+  $type_name = node_type_get_name($node);
+  drupal_set_title(t('<em>Edit @type</em> @title', array(
+    '@type' => $type_name,
+    '@title' => $node->title
+  )), PASS_THROUGH);
+  return drupal_get_form($node->type . '_node_form', $node);
+}
+
+/**
+ * Implement function to_arg()
+ * @param $arg
+ */
+function user_to_arg($arg) {
+  global $user;
+  // if (arg(1) == $user->uid)
+  return $user->uid;
+}
+
+
+//function heydesk_user_verifications($uid) {
+//  $output = '';
+//
+//  return drupal_get_form('heydesk_user_verification_form');
+//}
+
+function heydesk_user_verification_form($form, $form_state) {
+  //$call =  $form_state->loadInclude('node', 'heydesk_user', 'ctools/validator.pages');
+
+  global $user;
+  $order_user = user_load($user->uid);
+  // dpm($order_user);
+  $status_validator = array(
+    'mobile_number_validation' => isset($order_user->field_mobile_varifity[LANGUAGE_NONE][0]['value']) ? $order_user->field_mobile_varifity[LANGUAGE_NONE][0]['value'] : 0,
+    'facebook_validation' => isset($order_user->field_facebook_ver[LANGUAGE_NONE][0]['value']) ? $order_user->field_facebook_ver[LANGUAGE_NONE][0]['value'] : 0,
+    'id_validation' => isset($order_user->field_id_verification[LANGUAGE_NONE][0]['value']) ? $order_user->field_id_verification[LANGUAGE_NONE][0]['value'] : 0,
+  );
+  $mobile_valid = $status_validator['mobile_number_validation'];
+  $favebook_valid = $status_validator['facebook_validation'];
+  $mid_valid = $status_validator['id_validation'];
+  $form['pag_title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Verifications') . '</h1>',
+    '#suffix' => '<div id="verification_page">',
+  );
+  $form['user_id'] = array(
+    '#type' => 'value',
+    '#value' => $user->uid,
+  );
+  $form['page_description'] = array(
+    '#type' => 'markup',
+    '#markup' => '<span>' . t('Make sure your profile is trustworthy by verifying your identity.') . '</span>',
+  );
+  //  $form['mobile'][ '#actions'] =   url('validator/ajax/mobile');
+
+
+  $form['mobile']['mobile_number'] = array(
+    '#type' => 'fieldset',
+    '#attributes' => array('class' => array('validate_item')),
+    '#tree' => TRUE,
+  );
+  $form['mobile']['mobile_number']['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<span class="left-title-validator">' . t('Mobile Phone Number :') . '</span>',
+  );
+  if ($mobile_valid == 0) {
+
+    $form['mobile']['mobile_number']['code'] = array(
+      '#type' => 'textfield',
+      '#description' => t(''),
+      '#required' => TRUE,
+      '#default_value' => isset($order_user->field_phone_code[LANGUAGE_NONE][0]) ? $order_user->field_phone_code[LANGUAGE_NONE][0]['value'] : '',
+      '#size' => 5,
+      '#prefix' => '+',
+      '#suffix' => '',
+    );
+    $form['mobile']['mobile_number']['mobile'] = array(
+      '#type' => 'textfield',
+      '#description' => t(''),
+      '#required' => TRUE,
+      '#size' => 7,
+      '#default_value' => isset($order_user->field_phone_number[LANGUAGE_NONE][0]) ? $order_user->field_phone_number[LANGUAGE_NONE][0]['value'] : '',
+      // '#suffix' => '</div></div>',
+    );
+    //     form_load_include($form_state, 'inc', 'heydesk_user', 'validator.pages');
+    //    form_load_include($form_state, 'inc', 'heydesk_user', 'ctools/heydesk_user_ctools');
+
+    heydesk_ctools_popup_style();
+
+    //      ctools_modal_include_modal();
+    $form['mobile']['mobile_number']['button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Validate Mobile Now'),
+      '#attributes' => array(
+        'class' => array('ctools-modal-small-popup-style')
+      ),
+      '#ajax' => array(
+        //        'wrapper' => 'body',
+        'callback' => 'heydesk_ctools_validator_page_callback',
+      ),
+      //      '#markup' =>ctools_modal_text_button(t('Mobile Verification'), 'ctools/nojs/validator', t('Mobile Verification'), 'ctools-modal-heydesk_ctools-contact-style'),
+      //'#submit' => array('heydesk_mobile_validator')
+    );
+    //    $form['mobile_number']['button'] = array(
+    //      '#type' => 'button',
+    //      '#value' => t('Validate Now'),
+    //      '#submit' => array('heydesk_mobile_validator')
+    //    );
+
+  }
+  else {
+
+    $form['mobile']['mobile_number']['verified'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="verified"><span></span>' . t('Your mobile number is verified.') . '</div>',
+
+    );
+  }
+  /////////// Facebook
+
+  $form['facebook'] = array(
+    '#type' => 'fieldset',
+    '#attributes' => array('class' => array('validate_item')),
+    '#tree' => TRUE,
+  );
+  $form['facebook']['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<span class="left-title-validator">' . t('Facebook :') . '</span>',
+  );
+  if ($favebook_valid == 0) {
+    global $base_url;
+    require_once(drupal_get_path('module', 'heydesk_user') . '/facebook/vendor/autoload.php');
+
+
+    $fb = new Facebook\Facebook([
+      'app_id' => variable_get('heydesk_facebook_key', ''),
+      'app_secret' => variable_get('heydesk_facebook_secret_key', ''),
+      'default_graph_version' => 'v2.8',
+    ]);
+    # login.php
+
+
+    $helper = $fb->getRedirectLoginHelper();
+    $permissions = ['email', 'user_likes']; // optional
+    $loginUrl = $helper->getLoginUrl($base_url . '/facebook', $permissions);
+
+    $link = l(t('Validate Facebook Now'), $loginUrl);
+    //    '<a href="' . htmlspecialchars($loginUrl) . '">Validate Facebook!</a>';
+
+    $form['facebook']['button'] = array(
+      '#type' => 'markup',
+      '#markup' => $link
+      //      '#submit' => array('heydesk_facebook_validator')
+    );
+
+  }
+  else {
+
+    $form['facebook']['verified'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="verified"><span></span>' . t('Your account is connected to Facebook..') . '</div>',
+
+    );
+  }
+  ///////////////////ID
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="normalno"><div class="id_validator_wriper"></div><span class="left-title-validator">' . t('ID Validation :') . '</span>',
+  );
+
+  if ($mid_valid != 2) {
+    $validate_mess = array(
+      0 => t('Your account is not validated'),
+      1 => t('Your account is validation pending'),
+    );
+    $form['text_no_valid'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="text_not_validate"><span class="no-verifed"></span><span>' . $validate_mess[$mid_valid] . '</span></div></div>',
+    );
+    $form['id_validator'] = array(
+      '#type' => 'fieldset',
+      '#attributes' => array('class' => array('validate_item')),
+      '#tree' => TRUE,
+    );
+
+
+    $form['id_validator']['photo'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Please upload these forms of ID'),
+      '#attributes' => array('class' => array('row')),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+
+
+    );
+    $form['id_validator']['photo']['block_1'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="inline-block block-1">'
+    );
+    $form['id_validator']['photo']['profile'] = array(
+      '#type' => 'managed_file',
+      '#upload_location' => 'public://user_avatar/',
+      //      '#theme' => 'fapi_image_preview',
+      '#title' => t('Profile Picture:'),
+      '#default_value' => isset($order_user->picture->fid) ? $order_user->picture->fid : '',
+      //    '#required' => TRUE,
+      //  '#attributes' => array('class' => array('col-sm-3')),
+
+    );
+    $form['id_validator']['photo']['block_2'] = array(
+      '#type' => 'markup',
+      '#markup' => '</div><div class="inline-block  block-2">'
+    );
+    $form['id_validator']['photo']['img_cart_front'] = array(
+      '#type' => 'managed_file',
+      //      '#theme' => 'media_widget',
+      '#title' => t('ID Card ( Front )'),
+      '#default_value' => isset($order_user->field_id_card_front_[LANGUAGE_NONE][0]['fid']) ? $order_user->field_id_card_front_[LANGUAGE_NONE][0]['fid'] : '',
+      '#required' => TRUE,
+
+    );
+    $form['id_validator']['photo']['block_3'] = array(
+      '#type' => 'markup',
+      '#markup' => '</div><div class="inline-block block-3">'
+    );
+
+    $form['id_validator']['photo']['img_cart_back'] = array(
+      '#type' => 'managed_file',
+      //      '#theme' => 'media_widget',
+      '#title' => t('ID Card ( Back )'),
+      '#default_value' => isset($order_user->field_id_card_back_[LANGUAGE_NONE][0]['fid']) ? $order_user->field_id_card_back_[LANGUAGE_NONE][0]['fid'] : '',
+      '#required' => TRUE,
+
+      //  '#attributes' => array('class' => array('col-sm-3')),
+
+    );
+    $form['id_validator']['photo']['block_4'] = array(
+      '#type' => 'markup',
+      '#markup' => '</div><div class="inline-block block-4">'
+    );
+    $form['id_validator']['photo']['img_cart_security'] = array(
+      '#type' => 'managed_file',
+      //      '#theme' => 'media_widget',
+      '#title' => t('Social Security Card'),
+      '#default_value' => isset($order_user->field_social_security_card[LANGUAGE_NONE][0]['fid']) ? $order_user->field_social_security_card[LANGUAGE_NONE][0]['fid'] : '',
+      //   '#attributes' => array('class' => array('col-sm-3')),
+      '#required' => TRUE,
+
+    );
+    $form['id_validator']['photo']['block_5'] = array(
+      '#type' => 'markup',
+      '#markup' => '</div>'
+    );
+    $form['id_validator']['photo']['button'] = array(
+      '#type' => 'submit',
+      '#value' => t('Validate ID Number Now'),
+      '#submit' => array('heydesk_id_validator_submit')
+    );
+
+
+  }
+  else {
+    $form['id_validator']['verified'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="verified"><span></span>' . t('Your ID number has been verified.') . '</div></div>',
+
+    );
+
+  }
+
+
+  $form['end_element'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div></div>'
+  );
+  $form['#attached']['js'][] = drupal_get_path('module', 'heydesk_user') . '/js/heydesk-validator-form.js';
+
+
+  return $form;
+
+
+}
+
+//function heydesk_phone_validator($form, &$form_state){
+//
+//
+//  drupal_gote('validator/no_js/mobile');
+//}
+
+function heydesk_id_validator_submit($form, &$form_state) {
+  $user = user_load($form_state['values']['user_id']);
+
+  $images = array(
+    $form_state['values']['id_validator']['photo']['profile'],
+    $form_state['values']['id_validator']['photo']['img_cart_front'],
+    $form_state['values']['id_validator']['photo']['img_cart_back'],
+    $form_state['values']['id_validator']['photo']['img_cart_security'],
+  );
+  foreach ($images as $fid) {
+    $file = file_load($fid);
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+    $user->file = $file->fid;
+    file_usage_add($file, 'user', 'user', $user->uid);
+  }
+
+  $user->picture->fid = $form_state['values']['id_validator']['photo']['profile'];
+  $user->field_user_avatar[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_validator']['photo']['profile'];
+  $user->field_id_card_front_[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_validator']['photo']['img_cart_front'];
+  $user->field_id_card_back_[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_validator']['photo']['img_cart_back'];
+  $user->field_social_security_card[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_validator']['photo']['img_cart_security'];
+  $user->field_id_verification[LANGUAGE_NONE][0]['value'] = 1;
+
+  $user = user_save($user);
+
+
+}
+
+/**
+ * Realising page list proposal for user
+ */
+function heydesk_manage_listing_list($user) {
+
+  $nodes = db_select('node', 'n')
+    ->fields('n')
+    ->condition('n.type', 'proposal')
+    ->condition('n.uid', $user->uid)
+    ->condition('n.status', 1)// ->limit(5)
+    ->orderBy('n.created', 'DESC')
+    ->execute()
+    ->fetchAll();
+  // dpm($nodes);
+
+  $output = '<h1 class="title_boost">' . t('Manage Listing') . '</h1>';
+  $output .= '<div class="red-atention"><div class="warnings"></div><h2>Set Your Listings Prices!</h2>
+  <span>Remember to set the workspace rental pricesl.</span>';
+  $output .= '<div class="warnings"></div><h2>Update Workspace Rental Calendar!</h2>
+  <span>Remember to set the workspace rental calendar when the workspace is NOT available for rental.</span></div>';
+  $output .= '<div class="list-item page17_boost_listing">';
+  heydesk_ctools_popup_style();
+
+
+  foreach ($nodes as $node) {
+    $proposal = node_load($node->nid);
+    $link_calendar = l(t('Calendar'), 'user/' . $proposal->uid . '/manage-listing/calendar/' . $proposal->nid . '/' . date('m'));
+    $link_prices = l(t('Prices'), 'user/' . $proposal->uid . '/manage-listing/prices/' . $proposal->nid);
+    $link_setting = l(t('Settings'), 'user/' . $proposal->uid . '/manage-listing/setting/' . $proposal->nid);
+    $edit_propisal_link = l(t('Edit'), 'user/' . $proposal->uid . '/node-edit/' . $proposal->nid);
+
+    $output .= '<div id="proposal-' . $node->nid . '" class="row">';
+    $output .= '<div class="col-md-3">';
+    $output .= l('<i class="fa fa-trash-o" aria-hidden="true"></i>', '/delete/' . $proposal->nid . '/node/nojs', array(
+      'html' => TRUE,
+      'attributes' => array(
+        'class' => array(
+          'dark_link',
+          'ctools-use-modal',
+          'ctools-modal-first-popup-style'
+        )
+      )
+    ));
+    $output .= theme('image_style', array(
+      'style_name' => 'proposal_200x170',
+      'path' => file_uri_target($proposal->field_photos[LANGUAGE_NONE][0]['uri']),
+      'title' => $proposal->title,
+      'alt' => $proposal->title
+    ));
+    $output .= '</div>';
+    $output .= '<div class="col-md-7">';
+    $output .= '<h3>' . $proposal->title . '</h3>';
+
+    $body = field_view_field('node', $proposal, 'field_location_description', array(
+      'label' => 'hidden',
+      'type' => 'text_summary_or_trimmed',
+      'settings' => array('trim_length' => 150),
+    ));
+    $empty_string = empty($body) ? '<p>&nbsp;</p>' : NULL;
+
+
+    $output .= '<p class="description">' . render($body) . '</p>';
+    $output .= '<p class="point_adress"><i class="fa fa-map-marker" aria-hidden="true"></i>';
+    $output .= $proposal->field_address[LANGUAGE_NONE][0]['value'] . ', ' . _term_name($proposal->field_sities[LANGUAGE_NONE][0]['tid']) . ', ' . _term_name($proposal->field_country[LANGUAGE_NONE][0]['tid']);
+    $output .= '</p>';
+    $output .= $empty_string;
+    $output .= '<p><div class="btn btn-default btn_calendar">' . $link_calendar . '</div>';
+    $output .= '<div class="btn btn-default btn_prices">' . $link_prices . '</div>';
+    $output .= '<div class="btn btn-default btn_edit">' . $edit_propisal_link . '</div>';
+    $output .= '<div class="btn btn-default btn_settings">' . $link_setting . '</div>';
+
+    $output .= '</p>';
+    $output .= '</div>';
+    $output .= '<div class="col-md-2">';
+    $output .= '<p class="price_per_day">';
+    $output .= t('from ');
+    $output .= isset($proposal->field_price[LANGUAGE_NONE][0]['value']) ? $proposal->field_price[LANGUAGE_NONE][0]['value'] : 0;
+    $output .= ' / ';
+    $output .= isset($proposal->field_minimum_rental_period[LANGUAGE_NONE][0]['value']) ? $proposal->field_minimum_rental_period[LANGUAGE_NONE][0]['value'] : 0 . '</p>';
+    $boost_class = (isset($proposal->field_features_[LANGUAGE_NONE][0]) && ($proposal->field_features_[LANGUAGE_NONE][0]['value'] == 1)) ? ' disabled' : '';
+    $output .= '<div id="boost-' . $proposal->nid . '" class="button boost' . $boost_class . '">';
+    $output .= l('<span class="rocket"></span>' . t('Boost Listing'), 'boosting/' . $proposal->nid . '/nojs', array(
+      'attributes' => array(
+        'class' => array(
+          'ctools-use-modal',
+          'ctools-modal-first-popup-style'
+        )
+      ),
+      'html' => TRUE,
+    ));
+    $output .= '</div>';
+    $output .= '</div>';
+    $output .= '</div>';
+  }
+
+  $block = block_load('heydesk_user', 'heydesk_user_listing');
+  $render_array = _block_get_renderable_array(_block_render_blocks(array($block)));
+  $output .= l(t('+ Add Another Listing'), 'user/' . $user->uid . '/add-proposal', array('attributes' => array('class' => array('add_listing'))));
+  $output .= '<div id="boost-your grey">';
+  $output .= '<div class="""col-md-12Q">';
+  $output .= '';
+  $output .= '';
+  $output .= render($render_array);
+  //  dpm($block);
+  //    $output .= '</div>';
+  //  $output .= '<div class"col-md-7">';
+
+  $output .= '</div>';
+  $output .= '</div>';
+
+
+  $output .= '</div>';
+  return $output;
+}
+
+function heydesk_user_setting_profile_form($form, $form_state) {
+  global $user;
+  $user = user_load($user->uid);
+  //  dpm($user);
+  $facebook_id = isset($user->field_fasebook_id[LANGUAGE_NONE][0]['value']) ? $user->field_fasebook_id[LANGUAGE_NONE][0]['value'] : '';
+  $form['title'] = array(
+    '#type' => 'markup',
+    //<editor-fold desc="Description">
+    '#markup' => '<h1>' . t('Settings') . '</h1>',
+    //</editor-fold>
+  );
+  $form['setting'] = array(
+    '#type' => 'fieldset',
+  );
+  if ($facebook_id) {
+    $form['setting']['email'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div class="setting_header"><label>E-mail:</label><span>' . $user->mail . '</span><div class="small-text">You are logged in using your Facebook account. Authentication is done via Facebook, a
+
+nd you can not change the e-mail locally on Heydesk.</div></div>'
+    );
+  };
+  $form['setting']['reg'] = array(
+    '#type' => 'fieldset',
+  );
+  if (!$facebook_id) {
+    $form['setting']['reg']['mail'] = array(
+      '#type' => 'textfield',
+      '#title' => t('E-Mail:'),
+      //      '#description' => t('Change email'),
+      '#default_value' => $user->mail,
+    );
+  }
+  $form['setting']['reg']['titl'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="reg_account">' . t('Reg. + Account number :') . '</div>',
+  );
+  $form['setting']['reg']['reg_no'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Reg. No'),
+  );
+  $form['setting']['reg']['acc_no'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Account No'),
+  );
+  $form['setting']['card'] = array();
+  $form['setting']['lang'] = array(
+    '#type' => 'select',
+    '#title' => t('Language'),
+    '#options' => array(
+      'en' => t('English'),
+      'da' => t('Danish')
+    ),
+
+
+  );
+  $array_chekboxes = array(
+    '1' => isset($user->field_receive_e_mail_messages[LANGUAGE_NONE][0]) ? $user->field_receive_e_mail_messages[LANGUAGE_NONE][0]['value'] : 0,
+    '2' => isset($user->field_receive_e_mail_with_activi[LANGUAGE_NONE][0]['value']) ? $user->field_receive_e_mail_with_activi[LANGUAGE_NONE][0]['value'] : 0,
+    '3' => isset($user->field_receive_e_mail_with_search[LANGUAGE_NONE][0]['value']) ? $user->field_receive_e_mail_with_search[LANGUAGE_NONE][0]['value'] : 0,
+  );
+
+  $form['setting']['notif'] = array(
+    '#title' => t('Notifications:'),
+    '#type' => 'checkboxes',
+    '#options' => array(
+      '1' => t('Receive e-mail messages from other users.'),
+      '2' => t('Receive e-mail with requests / bookings / recommendations.'),
+      '3' => t('Receive e-mail with matches on your searches.'),
+    ),
+  );
+  foreach ($array_chekboxes as $key => $def_val) {
+    if ($def_val == 1) {
+      $form['setting']['notif'][$key]['#attributes'] = array('checked' => 'checked');
+    }
+  };
+  $form['setting']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#submit' => array('heydesk_user_setting_profile_form_submit'),
+  );
+
+  $form['setting']['close'] = array(
+    '#type' => 'fieldset',
+    '#attributes' => array(
+      'class' => array(
+        'delete_acc'
+      )
+    ),
+  );
+
+  $form['setting']['close']['titl'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h4>' . t('Close your account :') . '</h4>',
+  );
+  $form['setting']['close']['markup'] = array(
+    '#type' => 'markup',
+    '#markup' => 'Once you have disabled your account, all your information, including listings any receivables,messages, events, etc will be removed from the site immediately.'
+  );
+  $form['setting']['close']['button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Close my account'),
+    '#attributes' => array(
+      'class' => array(
+        'link-button'
+      )
+    ),
+
+  );
+  return $form;
+}
+
+function heydesk_user_setting_profile_form_submit($form, &$form_state) {
+  //  dpm($form_state);
+  global $user;
+  $user = user_load($user->uid);
+  $field_receive_e_mail_messages = $form_state['values']['notif'][1] != 0 ? 1 : 0;
+  $field_receive_e_mail_with_activi = $form_state['values']['notif'][2] != 0 ? 1 : 0;
+  //  != 0 ? 1 : 0;
+  $field_receive_e_mail_with_search = $form_state['values']['notif'][3] != 0 ? 1 : 0;
+  //  = 0 ? 1 : 0;
+  $user->field_receive_e_mail_messages['und'][0]['value'] = $field_receive_e_mail_messages;
+  $user->field_receive_e_mail_with_activi['und'][0]['value'] = $field_receive_e_mail_with_activi;
+  $user->field_receive_e_mail_with_search[LANGUAGE_NONE][0]['value'] = $field_receive_e_mail_with_search;
+  if ((!_heydesk_facebook_status($user->uid)) && ($form_state['values']['mail'] != $user->mail)) {
+    $user->mail = $form_state['values']['mail'];
+    $user->name = $form_state['values']['mail'];
+  }
+  $user = user_save($user);
+  if ($user) {
+    drupal_set_message(t('Setting Saved'));
+    $form_state['redirect'] = 'user';
+  }
+
+}
+
+/**
+ * Implements hook_form()
+ */
+function heydesk_user_users_profile_form($form, $form_state) {
+  global $user;
+
+
+  $lamer = user_load($user->uid);
+  //    dpm($lamer);
+  $terms = db_select('taxonomy_term_data', 't')->fields('t', array(
+    'name',
+    'tid',
+    'vid'
+  ))->orderBy('t.tid', 'ASC')->execute()->fetchAll();
+  //  $count = count($terms);
+  $cirys = array();
+  $field_disable = FALSE;
+  $first_name = isset($lamer->field_first_name[LANGUAGE_NONE][0]['value']) ? $lamer->field_first_name[LANGUAGE_NONE][0]['value'] : t('Heydesk User');
+
+  if (isset($user->field_linked_in_id[LANGUAGE_NONE][0])) {
+    $field_disable = TRUE;
+  }
+  $form['#attributes']['enctype'] = 'multipart/form-data';
+  //  dpm($lamer);
+  //  $form['#attributes'] = array('enctype' => «multipart / form - data»);
+  $form['first_name'] = array(
+    '#type' => 'textfield',
+    '#disabled' => $field_disable,
+    '#title' => t('First Name:'),
+    '#required' => TRUE,
+    '#default_value' => $first_name,
+  );
+  $form['address'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Address:'),
+    '#required' => TRUE,
+    '#default_value' => isset($lamer->field_address[LANGUAGE_NONE][0]['value']) ? $lamer->field_address[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['surname'] = array(
+    '#type' => 'textfield',
+    '#disabled' => $field_disable,
+    '#title' => t('Surname:'),
+    '#required' => TRUE,
+    '#default_value' => isset($lamer->field_surname[LANGUAGE_NONE][0]['value']) ? $lamer->field_surname[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['profile_text'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Profile Text:'),
+    '#default_value' => isset($lamer->field_profile_text_[LANGUAGE_NONE][0]['value']) ? $lamer->field_profile_text_[LANGUAGE_NONE][0]['value'] : '',
+    '#resizable' => FALSE
+  );
+  $form['picture'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Profile Image:'),
+    '#upload_location' => 'public://user_avatar/',
+    '#theme' => 'fapi_image_preview',
+    '#required' => TRUE,
+    '#default_value' => isset($lamer->field_user_avatar[LANGUAGE_NONE][0]['fid']) ? $lamer->field_user_avatar[LANGUAGE_NONE][0]['fid'] : FALSE,
+    //    '#prefix' => '<div class="no_image"></div>',
+
+    //      '#theme' => 'preview_image',
+  );
+  $form['phone_code'] = array(
+    '#type' => 'textfield',
+    '#default_value' => isset($lamer->field_phone_code[LANGUAGE_NONE][0]['value']) ? $lamer->field_phone_code[LANGUAGE_NONE][0]['value'] : '',
+    '#size' => 5
+  );
+  $form['phone_number'] = array(
+    '#type' => 'textfield',
+    '#default_value' => isset($lamer->field_phone_number[LANGUAGE_NONE][0]['value']) ? $lamer->field_phone_number[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['nationality'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Nationality:'),
+    '#default_value' => isset($lamer->field_nationality[LANGUAGE_NONE][0]['value']) ? $lamer->field_nationality[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['education'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Education:'),
+    '#default_value' => isset($lamer->field_education_[LANGUAGE_NONE][0]['value']) ? $lamer->field_education_[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['zip_code'] = array(
+    '#type' => 'textfield',
+    // '#title' => t('Name:'),
+    '#default_value' => isset($lamer->field_zip_code[LANGUAGE_NONE][0]['value']) ? $lamer->field_zip_code[LANGUAGE_NONE][0]['value'] : '',
+    '#size' => 5
+  );
+  $form['employment'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Employment:'),
+    '#default_value' => isset($lamer->field_employment[LANGUAGE_NONE][0]['value']) ? $lamer->field_employment[LANGUAGE_NONE][0]['value'] : '',
+  );
+  $form['sities'] = array(
+    '#type' => 'textfield',
+    // '#title' => t('Sity:'),
+    '#required' => TRUE,
+    '#default_value' => isset($lamer->field_sities[LANGUAGE_NONE][0]['tid']) ? _term_name($lamer->field_sities[LANGUAGE_NONE][0]['tid']) : '',
+  );
+  $form['country'] = array(
+    '#type' => 'textfield',
+    '#title' => t('ID Number Issuing Country:'),
+    '#required' => TRUE,
+    '#default_value' => isset($lamer->field_country[LANGUAGE_NONE][0]['tid']) ? _term_name($lamer->field_country[LANGUAGE_NONE][0]['tid']) : '',
+  );
+  $form['credit_card'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Credit Card Number:'),
+    '#default_value' => isset($lamer->field_credit_card_number[LANGUAGE_NONE][0]['value']) ? $lamer->field_credit_card_number[LANGUAGE_NONE][0]['value'] : '',
+    '#maxlength' => 16
+  );
+  $date_of_borth = isset($lamer->field_date_of_birth[LANGUAGE_NONE][0]['value']) ? date('d.m.Y', strtotime($lamer->field_date_of_birth[LANGUAGE_NONE][0]['value'])) : '';
+  $form['date_of_birth'] = array(
+    '#type' => 'textfield',
+    '#format' => 'dd.mm.yyyy',
+    '#title' => t('Date of Birth:'),
+    '#attributes' => array('class' => array('date_of_birth_datepicker')),
+    '#default_value' => $date_of_borth,
+  );
+  $id_number_issuing_date = isset($lamer->field_id_number_issuing_date[LANGUAGE_NONE][0]['value']) ? date('d.m.Y', strtotime($lamer->field_id_number_issuing_date[LANGUAGE_NONE][0]['value'])) : '';
+  $form['id_number_issuing_date'] = array(
+    '#type' => 'textfield',
+    '#format' => 'dd.mm.yyyy',
+    '#title' => t('ID Number Issuing Date:'),
+    '#attributes' => array('class' => array('id_number_datepicker')),
+    '#default_value' => $id_number_issuing_date,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#attributes' => array('class' => array('button', 'button-submit')),
+  );
+  $form['#attached']['library'][] = array('system', 'ui.datepicker');
+  $form['#attached']['js'][] = drupal_get_path('module', 'heydesk_user') . '/js/heydesk-user-form.js';
+
+
+  return $form;
+}
+
+function heydesk_user_users_profile_form_validate($form, $form_state) {
+  $file = $form_state['values']['picture'];
+
+  //Save multiple files
+  $file = file_save_upload('picture', array(
+    'file_validate_is_image' => array(),
+    'file_validate_extensions' => array('png gif jpg jpeg'),
+  ));
+  if ($file) {
+    if ($file = file_move($file, 'public://')) {
+      $form_state['values']['picture'] = $file;
+    }
+    else {
+      form_set_error('file', t('Failed to write the uploaded file the site\'s file folder.'));
+    }
+  }
+  else {
+  }
+
+
+}
+
+function heydesk_user_users_profile_form_submit($form, &$form_state) {
+  global $user;
+
+  $terms = db_select('taxonomy_term_data', 't')->fields('t', array(
+    'name',
+    'tid',
+    'vid'
+  ))//    ->condition('t.vid', 2)
+  ->orderBy('t.tid', 'ASC')->execute()->fetchAll();
+  $count = count($terms);
+  $cirys = array();
+  $countres = array();
+  foreach ($terms as $term) {
+    if ($term->vid == 2) {
+      $cirys[] = $term;
+    }
+    else {
+      $countres[] = $term;
+    }
+  }
+
+  $file = file_load($form_state['values']['picture']);
+  $file->status = FILE_STATUS_PERMANENT;
+  //    echo '<pre>';
+  //  print_r($file);
+  //  echo '</pre>';
+  //  exit();
+  file_save($file);
+  $user->file = $file->fid;
+  file_usage_add($file, 'user', 'user', $user->uid);
+
+  //  dpm($form_state['values']);
+  foreach ($cirys as $city) {
+    if ($city->name == $form_state['values']['sities']) {
+      $form_state['values']['sities'] = $city->tid;
+    }
+    else {
+      $count = ++$count;
+      $count_city = $count;
+      $termin = (object) array(
+        'tid' => $count,
+        'vid' => 2,
+        'name' => $form_state['values']['sities'],
+      );
+      db_query("INSERT IGNORE INTO {taxonomy_term_data} (tid) VALUES (?)", array($termin->tid));
+      taxonomy_term_save($termin);
+      break;
+    }
+  }
+  foreach ($countres as $country) {
+    if ($country->name == $form_state['values']['country']) {
+      $form_state['values']['country'] = $country->tid;
+      break;
+    }
+    else {
+      $count = ++$count;
+      $id_count = $count;
+      $termin_p = (object) array(
+        'tid' => $count,
+        'vid' => 3,
+        'name' => $form_state['values']['country'],
+      );
+      db_query("INSERT IGNORE INTO {taxonomy_term_data} (tid) VALUES (?)", array($termin_p->tid));
+      taxonomy_term_save($termin_p);
+      break;
+    }
+  }
+
+  $date_birth = date('Y-m-d H:i:s', strtotime($form_state['values']['date_of_birth']));
+  $date_id_number = date('Y-m-d H:i:s', strtotime($form_state['values']['id_number_issuing_date']));
+
+  //  $date_birth = $form_state['values']['date_of_birth'];
+
+  //  date('')
+  //['month'] . ' ' . $form_state['values']['date_of_birth']['day'] . '' . $form_state['values']['date_of_birth']['year'];
+  //  $date_id_number = $form_state['values']['id_number_issuing_date'];
+  //['year'] . $form_state['values']['id_number_issuing_date']['month'] . ' ' . $form_state['values']['id_number_issuing_date']['day'] . '';
+
+  $user_prof = user_load($user->uid);
+  $user_prof->field_first_name[LANGUAGE_NONE][0]['value'] = $form_state['values']['first_name'];
+  $user_prof->field_address[LANGUAGE_NONE][0]['value'] = $form_state['values']['address'];
+  $user_prof->field_surname[LANGUAGE_NONE][0]['value'] = $form_state['values']['surname'];
+  $user_prof->field_profile_text_[LANGUAGE_NONE][0]['value'] = $form_state['values']['profile_text'];
+  $user_prof->picture->fid = $form_state['values']['picture'];
+  $user_prof->field_user_avatar[LANGUAGE_NONE][0]['fid'] = $form_state['values']['picture'];
+  $user_prof->field_phone_code[LANGUAGE_NONE][0]['value'] = $form_state['values']['phone_code'];
+  $user_prof->field_phone_number[LANGUAGE_NONE][0]['value'] = $form_state['values']['phone_number'];
+  $user_prof->field_nationality[LANGUAGE_NONE][0]['value'] = $form_state['values']['nationality'];
+  $user_prof->field_education_[LANGUAGE_NONE][0]['value'] = $form_state['values']['education'];
+  $user_prof->field_zip_code[LANGUAGE_NONE][0]['value'] = $form_state['values']['zip_code'];
+  $user_prof->field_employment[LANGUAGE_NONE][0]['value'] = $form_state['values']['employment'];
+  $user_prof->field_sities[LANGUAGE_NONE][0]['tid'] = $count_city;
+  $user_prof->field_country[LANGUAGE_NONE][0]['tid'] = $id_count;
+
+  $user_prof->field_nationality[LANGUAGE_NONE][0]['value'] = $form_state['values']['nationality'];
+  $user_prof->field_date_of_birth[LANGUAGE_NONE][0]['value'] = $date_birth;
+  // $user_prof->field_date_of_birth[LANGUAGE_NONE][0]['value'] = $form_state['values']['id_number_issuing_date'];
+  $user_prof->field_credit_card_number[LANGUAGE_NONE][0]['value'] = $form_state['values']['credit_card'];
+  $user_prof->field_id_number_issuing_date[LANGUAGE_NONE][0]['value'] = $date_id_number;;
+  $user_prof = user_save($user_prof);
+  //  dpm($form_state['values']['date_of_birth']);
+  if ($user_prof) {
+
+    drupal_set_message(t('Your account information has been updated and saved'));
+  }
+}
+
+
+function heydesk_proposal_prices_form($form, $form_state, $uid, $pid) {
+
+  $proposal = node_load($pid);
+  //  dpm($proposal);
+  $proposal->field_price[LANGUAGE_NONE][0]['value'] = isset($proposal->field_price[LANGUAGE_NONE][0]['value']) ? $proposal->field_price[LANGUAGE_NONE][0]['value'] : 0;
+  $price = isset($proposal->field_price[LANGUAGE_NONE][0]['value']) ? $proposal->field_price[LANGUAGE_NONE][0]['value'] : 0;
+
+  //  $hour = (int) $price / 8;
+  $day_3 = (int) $price * 3;
+  $week = (int) $price * 7;
+  $week_2 = (int) $price * 14;
+  $week_4 = (int) $price * 28;
+
+  drupal_add_js(array('save_prise' => $price), 'setting');
+  $form['title'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Manage Listing')
+  );
+  //  $form['#suffix'] = '<div class="clearfix"></div>';
+  $form['title']['warning'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="red-atention"><div class="warnings"></div><h2>Update Workspace Rental Calendar!</h2>
+  <span>Remember to set the workspace rental calendar when the workspace is NOT available for rental.</span></div>'
+  );
+  $form['proposal'] = array(
+    '#type' => 'value',
+    '#value' => $pid,
+  );
+  $form['prices'] = array(
+    '#type' => 'fieldset',
+    '#prefix' => '<div class="wriper_price row">',
+    '#tree' => TRUE,
+    '#attributes' => array('class' => array('col-sm-7')),
+  );
+  $form['prices']['title'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h1>' . t('Prices') . '</h1>',
+  );
+  $form['prices']['div'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="sheet"></div><div id="demo" style="width: 250px; margin: 20px"><div class="fsslider"><div class="fsfull-value"></div><div class="fssel-value" style="left: 0px; width: 155px;"></div><div class="fscaret" style="left: 150.2px; margin-left: -20px; z-index: 1;">' . $price . '</div></div></div>',
+  );
+  $form['prices']['choose'] = array(
+    //   '#title' => t('Choose price per day'),
+    '#type' => 'textfield',
+    '#default_value' => $price,
+  );
+  //  $form['prices']['hour'] = array(
+  //    '#type' => 'markup',
+  //    '#markup' => t('Per Hour') . '<span class="small-text">' . t('- equivalent to 1/8 day\'s rent. Minimum Booking: 4 hours') . '</span><span class="values">' . $hour . '</span>',
+  //    '#suffix' => '</div>',
+  //    '#prefix' => '<div id="hour">',
+  //    '#attributes' => array('id' => 'hour', 'class' => array('display-block')),
+  //  );
+  $form['prices']['day'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Per Day') . '<span class="values">' . $proposal->field_price[LANGUAGE_NONE][0]['value'] . '</span>',
+    '#attributes' => array('id' => 'day', 'class' => array('display-block')),
+    '#suffix' => '</div>',
+    '#prefix' => '<div id="day">',
+  );
+  $form['prices']['day_3'] = array(
+    '#type' => 'markup',
+    '#markup' => t('3 days') . '<span class="values">' . $day_3 . '</span>',
+    '#attributes' => array(
+      'id' => 'day-3',
+      'class' => array('display-block')
+    ),
+    '#suffix' => '</div>',
+    '#prefix' => '<div id="day-3">',
+  );
+  $form['prices']['week'] = array(
+    '#type' => 'markup',
+    '#markup' => t('Per week') . '<span class="values">' . $week . '</span>',
+    '#attributes' => array('id' => 'week', 'class' => array('display-block')),
+    '#suffix' => '</div>',
+    '#prefix' => '<div id="week">',
+  );
+  $form['prices']['week_2'] = array(
+    '#type' => 'markup',
+    '#markup' => t('2 weeks') . '<span class="values">' . $week_2 . '</span>',
+    '#attributes' => array(
+      'id' => 'week-2',
+      'class' => array('display-block')
+    ),
+    '#suffix' => '</div>',
+    '#prefix' => '<div id="week-2">',
+  );
+  $form['prices']['week_4'] = array(
+    '#type' => 'markup',
+    '#markup' => t('4 weeks') . '<span class="values">' . $week_4 . '</span>',
+    '#attributes' => array(
+      'id' => 'week-4',
+      'class' => array('display-block')
+    ),
+    '#suffix' => '</div>',
+    '#prefix' => '<div id="week-4">',
+  );
+  $form['prices']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#attributes' => array('class' => array('button', 'button-submit')),
+
+  );
+  $form['block_price'] = array(
+    '#type' => 'fieldset',
+    '#attributes' => array('class' => array('right_block col-sm-4'))
+  );
+
+  $form['block_price']['block'] = array(
+    '#type' => 'markup',
+    '#markup' => '</div><div class="text_block"><h3>' . t('Some info about long termrentings') . '</h3> <div>' . render_block_content('block', 5) . '</div></div>',
+    '#suffix' => '</div>',
+  );
+  $form['clearfix'] = array(
+    '#type' => 'markup',
+    '#markup' => ''
+  );
+  return $form;
+}
+
+function heydesk_proposal_prices_form_submit($form, &$form_state) {
+  global $user;
+  $proposal = node_load($form_state['values']['proposal']);
+  $proposal->field_price[LANGUAGE_NONE][0]['value'] = $form_state['values']['prices']['choose'];
+  $proposal = node_save($proposal);
+  $form_state['redirect'] = 'user/' . $user->uid . '/manage-listing';
+
+  if ($proposal) {
+    drupal_set_message(t('Price Save'));
+
+  }
+
+
+}
+
+function heydesk_proposal_setting_form($form, $form_state, $user, $pid) {
+
+  $proposal = node_load($pid);
+
+
+  $status_yes = $proposal->field_online[LANGUAGE_NONE][0]['value'] == 1 ? 'edit-yes' : 'edit-no';
+  $status_no = $proposal->field_online[LANGUAGE_NONE][0]['value'] == 1 ? 'edit-no' : 'edit-yes';
+  //  $status_no= $proposal->status == 0 ? 'edit-yes' : 'edit-no';
+  //  $status_yes = $proposal->status == 0 ? 'edit-no' : 'edit-yes';
+
+  $form['title'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Manage Listing')
+  );
+  $form['title']['warning'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="red-atention"><div class="warnings"></div><h2>Update Workspace Rental Calendar!</h2>
+  <span>Remember to set the workspace rental calendar when the workspace is NOT available for rental.</span></div>'
+  );
+  $form['proposal'] = array(
+    '#type' => 'value',
+    '#value' => $pid,
+  );
+  $form['user'] = array(
+    '#type' => 'value',
+    '#value' => $user->uid,
+  );
+  $form['setting'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Settings'),
+    '#prefix' => '<div class="border_form">'
+  );
+  $form['setting']['long_term'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('I am interested in long term rental') . '<span>' . t(' (minimum 14 days)') . '</span>',
+    '#prefix' => '<h3>' . t('Long-term rentals') . '</h3>',
+    '#default_value' => $proposal->field_long_term_rentals[LANGUAGE_NONE][0]['value'],
+
+  );
+
+  $form['setting']['rental_period'] = array(
+    '#type' => 'select',
+    '#title' => t('Minimum rental period'),
+    '#options' => array(
+      'day' => t('1 Day'),
+      'week' => t('1 Week'),
+      'mounts' => t('1 Mount'),
+    ),
+    '#default_value' => $proposal->field_minimum_rental_period[LANGUAGE_NONE][0]['value'],
+    '#description' => t('shortest period you want rental requests'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name = "long_term"]' => array('checked' => FALSE),
+      ),
+    ),
+  );
+  $form['setting']['rental_period_1'] = array(
+    '#type' => 'select',
+    '#title' => t('Minimum rental period'),
+    '#options' => array(
+      '14days' => t('14 Days'),
+      'mounts' => t('1 Mount'),
+    ),
+    '#default_value' => $proposal->field_minimum_rental_period[LANGUAGE_NONE][0]['value'],
+    '#description' => t('shortest period you want rental requests'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name = "long_term"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+  $form['setting']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#submit' => array('heydesk_proposal_setting_form_submit'),
+    '#attributes' => array(
+      'class' => array('button-submit', 'button'),
+    ),
+  );
+
+  $form['active'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Active'),
+    '#description' => t('Choose Online to put the workspace online for rental. Select Offline to disable the workspace temporarily.'),
+  );
+  $form['active']['status'] = array(
+    '#type' => 'value',
+    '#value' => $proposal->field_online[LANGUAGE_NONE][0]['value'],
+  );
+
+  $form['active']['yes'] = array(
+    '#type' => 'submit',
+    '#value' => t('Online'),
+    '#submit' => array('heydesk_proposal_status'),
+    '#attributes' => array('id' => $status_yes),
+
+  );
+  $form['active']['no'] = array(
+    '#type' => 'submit',
+    '#value' => t('Offline'),
+    '#submit' => array('heydesk_proposal_status'),
+    '#attributes' => array('id' => $status_no),
+    '#suffix' => '</div>'
+  );
+
+  return $form;
+}
+
+function heydesk_proposal_setting_form_submit($form, &$form_state) {
+  $proposal = node_load($form_state['values']['proposal']);
+  $proposal->field_long_term_rentals[LANGUAGE_NONE][0]['value'] = $form_state['values']['long_term'];
+
+  $proposal->field_minimum_rental_period[LANGUAGE_NONE][0]['value'] = $form_state['values']['long_term'] == 0 ? $form_state['values']['rental_period'] : $form_state['values']['rental_period_1'];
+  $proposal = node_save($proposal);
+  //  if ($proposal) {
+  $form_state['redirect'] = 'user/' . $form_state['values']['user'] . '/manage-listing';
+  //  }
+
+}
+
+function heydesk_proposal_status($form, &$form_state) {
+  $status = 1;
+  if ($form_state['values']['status'] == 1) {
+    $status = 0;
+  }
+  $proposal = node_load($form_state['values']['proposal']);
+  $values = array(
+    'status' => $status,
+  );
+  $proposal->field_online[LANGUAGE_NONE][0]['value'] = $status;
+  $proposal = node_save($proposal);
+  if ($proposal) {
+    drupal_set_message(t('Your action is save.'));
+  }
+
+
+}
+
+
+function heydesk_proposal_add_form($form, &$form_state) {
+
+  return node_add('proposal');
+
+  // return $form;
+}
+
+function heydesk_proposal_edit_form($form, &$form_state) {
+
+  return node_edit('proposal', arg(1));
+
+  // return $form;
+}
+
+//function _heydesk_entity_array($string) {
+//
+//    switch ($string) {
+//     // case  :
+//
+//    }
+//}
+function heydesk_confirm_delete_entity_form($form, &$form_state) {
+  switch ($form_state['type']) {
+    case 'heydesk_listing':
+      $text = t('Do you want to Cancel Booking?');
+      $button_text = t('Cancel Booking');
+      break;
+
+  }
+
+  $form['text'] = array(
+    '#type' => 'markup',
+    '#markup' => '<h3>' . $text . '</h3>'
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => $button_text,
+    '#ajax' => array(
+      'callback' => 'heydesk_admin_delete_entity_submit',
+    )
+  );
+  return $form;
+
+}
+
+function heydesk_admin_delete_entity_submit($form, &$form_state) {
+  global $user;
+
+  if ($form_state['type'] == 'heydesk_listing') {
+    $entity = heydesk_listing_load($form_state['eid']);
+    $entity->status = 0;
+    $entity = entity_save($form_state['type'], $entity);
+
+
+    ctools_include('ajax');
+    ctools_include('modal');
+    if ($entity) {
+      $comment_link = l(t('Add Review'), '/comments/add/' . $form_state['eid'] . '/nojs', array(
+        'attributes' => array(
+          'class' => array(
+            'ctools-use-modal',
+            //          'ctools-modal-first-popup-style'
+          ),
+        ),
+      ));
+      $selector = '#remove-button-' . $form_state['eid'];
+      $commands[] = ajax_command_html($selector, $comment_link);
+    }
+    $commands[] = ctools_modal_command_dismiss();
+    $commands[] = ctools_ajax_command_redirect('user/' . $user->uid . '/booking-overview');
+
+  }
+  print ajax_render($commands);
+  exit;
+
+
+}
+
+function heydesk_admin_delete_entity_callback($eid, $type, $js = NULL) {
+
+  if (!$js) {
+    // Если JavaScript отключен — выводим содержимое без всплывающего окна.
+    return drupal_get_form('heydesk_confirm_delete_entity_form');
+  }
+  ctools_include('ajax');
+  ctools_include('modal');
+  // Устанавливаем начальные настройки формы.
+  $form_state = array(
+    'ajax' => TRUE,
+    'title' => t('Form title'),
+    'eid' => $eid,
+    'type' => $type,
+  );
+  $output = ctools_modal_form_wrapper('heydesk_confirm_delete_entity_form', $form_state);
+  print ajax_render($output);
+  drupal_exit();
+
+}
+

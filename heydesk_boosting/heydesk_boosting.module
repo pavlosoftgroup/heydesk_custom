@@ -1,0 +1,351 @@
+<?php
+drupal_add_css(drupal_get_path('module', 'heydesk_boosting') . '/css/heydesk-boosting.css');
+
+function heydesk_boosting_menu() {
+
+  $items['admin/config/administration/heydesk'] = array(
+    'title' => t('Heydesk'),
+    'description' => t('Setting Heydesk'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_boosting_setting_form'),
+    'access callback' => TRUE,
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/administration/heydesk/boost'] = array(
+    'title' => t('Heydesk Boost'),
+    'description' => t('Setting Heydesk Boost'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+  );
+  return $items;
+}
+
+function heydesk_boosting_setting_form($form, $form_state) {
+
+  $form['boost'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Price and Period')
+  );
+  for ($i = 1; $i < 5; $i++) {
+
+    $form['boost']['input_' . $i] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Select ' . $i),
+      '#tree' => TRUE,
+      '#prefix' => '<div class="container-inline">',
+      '#suffix' => '</div>',
+    );
+    $form['boost']['input_' . $i]['period'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Period'),
+      '#description' => t('Enter the duration in days'),
+      '#size' => 3,
+      '#default_value' => isset(variable_get('boost', '')[$i]['period']) ? variable_get('boost', '')[$i]['period'] : '',
+    );
+    $form['boost']['input_' . $i]['price'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Price'),
+      '#description' => t('Enter the price for the period'),
+      '#size' => 5,
+      '#default_value' => isset(variable_get('boost', '')[$i]['price']) ? variable_get('boost', '')[$i]['price'] : '',
+
+    );
+  }
+  $form['boost']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit')
+  );
+  $form['text'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Text in Boost Block')
+  );
+  $form['text']['title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Title List'),
+    '#default_value' => isset(variable_get('boost_text', '')['title']) ? variable_get('boost_text', '')['title'] : '',
+
+  );
+  for ($i = 1; $i < 4; $i++) {
+    $form['text']['li_' . $i] = array(
+      '#type' => 'textfield',
+      '#title' => t('List ') . $i,
+      '#default_value' => isset(variable_get('boost_text', '')['list'][$i]) ? variable_get('boost_text', '')['list'][$i] : '',
+    );
+  }
+  $form['text']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#submit' => array('heydesk_boosting_setting_form_text_submit')
+  );
+
+  return $form;
+}
+
+function heydesk_boosting_setting_form_text_submit($form, &$form_state) {
+  $value = array();
+  for ($i = 1; $i < 4; $i++) {
+    $value['list'][$i] = $form_state['values']['li_' . $i];
+  }
+  $value['title'] = $form_state['values']['title'];
+
+
+  variable_set('boost_text', $value);
+
+
+}
+
+function heydesk_boosting_setting_form_validate($form, &$form_state) {
+  for ($i = 1; $i < 5; $i++) {
+
+    if (!is_numeric($form_state['values']['input_' . $i]['period'])) {
+      form_set_error('input_' . $i . '][period', t('Value in field "Select ' . $i . ' Period" is wrong.'));
+    }
+    if (!is_numeric($form_state['values']['input_' . $i]['price'])) {
+      form_set_error('input_' . $i . '][price', t('Value in field "Select ' . $i . ' Price" is wrong.'));
+    }
+  }
+}
+
+function heydesk_boosting_setting_form_submit($form, &$form_state) {
+  $value = array();
+  for ($i = 1; $i < 5; $i++) {
+    $value['time'] = array($form_state['values']['input_' . $i]['price'] => $form_state['values']['input_' . $i]['period']);
+    $value[$i] = array(
+      'period' => $form_state['values']['input_' . $i]['period'],
+      'price' => $form_state['values']['input_' . $i]['price']
+    );
+  };
+  variable_set('boost', $value);
+}
+
+
+function boosting_start_form($form, $form_state) {
+  $list = '<h4>' . isset(variable_get('boost_text', '')['title']) ? variable_get('boost_text', '')['title'] : '' . '</h4>';
+
+  $list .= '<ul>';
+
+  for ($i = 1; $i < 4; $i++) {
+    $list .= '<li>';
+    $list .= isset(variable_get('boost_text', '')['list'][$i]) ? variable_get('boost_text', '')['list'][$i] : '';
+    $list .= '</li>';
+  };
+
+  $list .= '</ul>';
+
+
+  $form['price'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="boosting-top">' . _heydesk_proposal_custom_view($form_state['proposal_id'], 'boost') . '</div>',
+  );
+  $form['list'] = array(
+    '#type' => 'markup',
+    '#markup' => '<div class="boosting_list">' . $list . '</div>',
+  );
+  $form['text'] = array(
+    '#type' => 'textfield',
+    '#title' => t('1. Write your personal ad text'),
+    '#attributes' => array('placeholder' => t('Your ad text here')),
+  );
+
+  //  heydesk_ctools_popup_style();
+
+  $active = array();
+  for ($i = 1; $i < 5; $i++) {
+    $day_str = _heydesk_value_not_empty(variable_get('boost', '')[$i]['period']) == 1 ? 'day' : 'days';
+    $active[_heydesk_value_not_empty(variable_get('boost', '')[$i]['price'])] = _heydesk_value_not_empty(variable_get('boost', '')[$i]['period']) . ' ' . $day_str . '-' . _heydesk_value_not_empty(variable_get('boost', '')[$i]['price']) . ' $';
+  }
+
+  //  $form['proposal_id'] = array(
+  //    '#type' => 'value',
+  //    '#value' => $form_state['proposal_id'],
+  //  );
+  $form['radios'] = array(
+    '#type' => 'radios',
+    '#title' => t('2. Select Period'),
+    '#default_value' => 1,
+    '#options' => $active,
+  );
+  $form['radios'][(variable_get('boost', '')[1]['price'])]['#attributes'] = array('checked' => 'checked');
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Deposit'),
+    '#ajax' => array(
+      'callback' => 'boosting_start_form_submit_ajax',
+    ),
+    '#submit' => array('boosting_start_form_submit'),
+//    '#validate' => array('boosting_start_form_validate'),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('button', 'submit'))
+  );
+  $form['cansel'] = array(
+    '#type' => 'button',
+    '#value' => t('Cancel'),
+    '#ajax' => array(
+      'callback' => 'operation_start_form_cancel',
+    ),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('button', 'cancel'))
+
+  );
+  return $form;
+}
+
+function boosting_start_form_validate($form, &$form_state) {
+
+}
+function operation_start_form_cancel() {
+  heydesk_ctools_popup_style();
+
+  $commands = array();
+
+  $commands[] = ctools_modal_command_dismiss();
+  return array('#type' => 'ajax', '#commands' => $commands);
+
+}
+
+function boosting_start_form_submit_ajax($form, &$form_state) {
+  heydesk_ctools_popup_style();
+
+//  $commands[] = ctools_modal_command_dismiss();
+  $commands = $form_state['commands'];
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+function boosting_start_form_submit($form, &$form_state) {
+
+  global $user;
+
+  heydesk_ctools_popup_style();
+  $operation_sheck = heydesk_peyment_check($form_state['uid'], $form_state['values']['radios']);
+  if ($operation_sheck == TRUE) {
+    $desc = array(
+      'payment' => t('Withdrawal Account'),
+      'description' => t('Payment Boost'),
+    );
+
+    $operation = heydesk_peyment_factoring($form_state['uid'], $form_state['values']['radios'], 9999999, $desc);
+
+    //  $operation_id =    heydesk_log_payment($user->uid, 1, 200);
+
+
+    if ($operation) {
+      $proposal = node_load($form_state['proposal_id']);
+      $proposal->field_features_[LANGUAGE_NONE][0]['value'] = 1;
+      $proposal->field_features_date_start[LANGUAGE_NONE][0]['value'] = time();
+      $proposal->field_feaiures_time[LANGUAGE_NONE][0]['value'] = $form_state['values']['radios'];
+      $proposal->field_personal_text[LANGUAGE_NONE][0]['value'] = isset($form_state['values']['text']) ? $form_state['values']['text'] : ' ';
+
+      $proposal = node_save($proposal);
+
+      $html = '<h3>' . t('Operation Successfully conducted') . '</h3>';
+      $html .= '<p>' . t('Operation:') . $desc['description'] . '</p>';
+
+      $form_state['commands'][] = ctools_modal_command_display(t('Operation Successfully conducted'), $html);
+
+
+      $form_state['commands'][] = ajax_command_invoke('#boost-' . $form_state['proposal_id'], 'addClass', array('disabled'));
+
+    }
+    else {
+      $html = '<h3>' . t('Operation Error conducted') . '</h3>';
+      //  $html .= '<p>' . t('Operation number ') . $operation_id . '</p>';
+      $form_state['commands'][] = ctools_modal_command_display(t('Operation Error conducted'), $html);
+
+    }
+
+
+    //  if ($proposal) {
+  }
+  else {
+    $html = '<h3>' . t('You do not have enough money in the account, Want to recharge your account?') . '</h3>';
+    $balanse_link = l(t('Yes'), 'user/' . $user->uid . '/deposit', array('attributes' => array('class' => array('button_link'))));
+    $no_link = l(t('No'), 'user/' . $user->uid . '/balance', array(
+      'attributes' => array(
+        'class' => array(
+          'button_link',
+          'btn_dark'
+        )
+      )
+    ));
+    $html .= $balanse_link . ' ' . $no_link;
+    $form_state['commands'][] = ctools_modal_command_display(t('Operation Error conducted'), $html);
+
+
+  }
+
+  //  }
+//return boosting_start_form_submit_ajax($commands);
+  //  $commands[] = ctools_modal_command_dismiss();
+//  return array('#type' => 'ajax', '#commands' => $commands);
+
+
+}
+
+function heydesk_bossting_start_ajax_callback($nid, $js = NULL) {
+  if (!$js) {
+
+
+    return drupal_get_form('boosting_start_form');
+
+  }
+  global $user;
+
+  heydesk_ctools_popup_style();
+
+
+  $form_state = array(
+
+    'ajax' => TRUE,
+    'title' => t('Start Boost'),
+    'proposal_id' => $nid,
+    'uid' => $user->uid,
+
+  );
+
+  $output = ctools_modal_form_wrapper('boosting_start_form', $form_state);
+
+  print ajax_render($output);
+
+  drupal_exit();
+
+}
+
+
+
+function heydesk_not_enough_money_form($form, $form_state) {
+  //  heydesk_ctools_popup_style();
+
+
+  $form['massage'] = array(
+    '#type' => 'html_tag',
+    '#tag' => 'h2',
+    '#value' => t('You do not have enough money in the account, Want to recharge your account?'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Deposit'),
+    '#ajax' => array(
+      'callback' => 'payment_start_form_submit',
+    ),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('button', 'submit')),
+  );
+  $form['cansel'] = array(
+    '#type' => 'submit',
+    '#title' => t('Cancel'),
+    '#ajax' => array(
+      'callback' => 'operation_start_form_cancel',
+    ),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('button', 'cancel'))
+
+  );
+  return $form;
+}

@@ -1,0 +1,793 @@
+<?php
+function heydesk_custom_function_init() {
+
+  drupal_add_js(drupal_get_path('module', 'heydesk_custom_function') . '/js/heydesk-custom-function.js');
+}
+
+function render_block_content($module, $delta) {
+  $output = '';
+  if ($block = block_load($module, $delta)) {
+    if ($build = module_invoke($module, 'block_view', $delta)) {
+      $delta = str_replace('-', '_', $delta);
+      drupal_alter(array(
+        'block_view',
+        "block_view_{$module}_{$delta}"
+      ), $build, $block);
+
+      if (!empty($build['content'])) {
+        return is_array($build['content']) ? render($build['content']) : $build['content'];
+      }
+    }
+  }
+  return $output;
+}
+
+function _heydesk_stars_proposal($nid) {
+  $node = node_load($nid);
+  $stars = isset($node->field_stars[LANGUAGE_NONE][0]['value']) ? $node->field_stars[LANGUAGE_NONE][0]['value'] : 0;
+  return _heydesk_stars_output($stars);
+
+
+}
+
+function _session_get($session_name, $default = 11) {
+  if (isset($_SESSION[$session_name])) {
+    return $_SESSION[$session_name];
+  }
+  return $default;
+}
+
+function _heydesk_facebook_status($uid) {
+  $user = user_load($uid);
+  return isset($user->field_fasebook_id[LANGUAGE_NONE][0]['value']) ? $user->field_fasebook_id[LANGUAGE_NONE][0]['value'] : FALSE;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function heydesk_custom_function_views_api() {
+  return array(
+    'api' => '3.0',
+    'path' => drupal_get_path('module', 'heydesk_custom_function') . '/views',
+  );
+}
+
+function _date_array($str) {
+  $lindate = strtotime($str);
+  $array_date = array(
+    'year' => date('Y', $lindate),
+    'month' => date('F', $lindate),
+    'day' => date('j', $lindate)
+  );
+  return $array_date;
+}
+
+
+function heydesk_autoficate_user($username, $password, $type = 'login') {
+  $op = ($type == 'register') ? '/profile' : '';
+  $count = db_select('users')
+    ->condition('mail', $username)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+  //  if ($count == 0) {
+  //    //   $password = user_password(8);
+  //
+  //    //set up the user fields
+  //    $fields = array(
+  //      'name' => $username,
+  //      'mail' => $username,
+  //      'pass' => $password,
+  //      'status' => 1,
+  //      //  'init' => 'email address',
+  //      'roles' => array(
+  //        DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+  //      ),
+  //    );
+  //
+  //    //the first parameter is left blank so a new user is created
+  //    $account = user_save('', $fields);
+  //
+  //    // If you want to send the welcome email, use the following code
+  //
+  //    // Manually set the password so it appears in the e-mail.
+  //    $account->password = $fields['pass'];
+  //
+  //    // Send the e-mail through the user module.
+  //    drupal_mail('user', 'register_no_approval_required', $username, NULL, array('account' => $account), variable_get('site_mail', 'heydesk@example.com'));
+  //
+  //
+  //  }
+
+  if (user_authenticate($username, $password)) {
+    $user_object = user_load_by_name($username);
+    $form_state = array();
+    $form_state['uid'] = $user_object->uid;
+    user_login_submit(array(), $form_state);
+    drupal_goto("user/" . $user_object->uid . $op);
+
+    return TRUE;
+  }
+  else {
+
+    drupal_goto('user/');
+  }
+
+
+  //  $user_object = user_load_by_name($email_gen);
+
+}
+
+
+function heydesk_registrate_user($username, $password) {
+  $emails = db_select('users', 'u')
+    ->fields('u', array('mail', 'uid'))
+    ->condition('u.mail', $username)
+    ->execute()
+    ->fetchAll();
+  if ($emails) {
+    drupal_set_message(t('You are already registered on the site. Log in using your email and password.'));
+    drupal_goto('user');
+  }
+  else {
+    $values = array(
+      'name' => $username,
+      'mail' => $username,
+      'pass' => $password,
+      'status' => 1,
+      'init' => $username,
+      'roles' => array(
+        DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+      ),
+    );
+
+    $account = user_save('', $values);
+    $account->password = $values['pass'];
+    $form_state = array();
+    $form_state['uid'] = $account->uid;
+    user_login_submit(array(), $form_state);
+    // drupal_goto("user/" . $account->uid);
+
+
+    // $result =  heydesk_autoficate_user($values['name'], $values['pass'], 'register ');
+    //
+    return $account;
+
+  }
+}
+
+function _linck_list_now($user) {
+  if ($user->uid) {
+    $output = '<a href="/user/' . $user->uid . '/add-proposal">List Now</a>';
+  }
+  else {
+    $output = '<a class="log-in-list-now">List Now</a>';
+  }
+  print $output;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function heydesk_custom_function_form_proposal_node_form_alter(&$form, &$form_state, $form_id) {
+  $form['#attached']['css'][] = drupal_get_path('module', 'heydesk_custom_function') . '/css/proposal-form.css';
+  $form['#attached']['js'][] = drupal_get_path('module', 'heydesk_custom_function') . '/js/proposal-form.js';
+  $form['title']['#prefix'] = '<div class="form-block-title">' . t('Where is your Listing located?') . '</div>';
+  $ajax_autocomplete = 'taxonomy-city-autocomplete/field_sities' . (isset($form_state['values']['field_country'][LANGUAGE_NONE][0]['tid']) ? '/' . $form_state['values']['field_country'][LANGUAGE_NONE][0]['tid'] : '');
+  if ($ajax_autocomplete != '') {
+    $form['field_sities'][LANGUAGE_NONE]['#autocomplete_path'] = $ajax_autocomplete;
+  }
+  $form['field_country'][LANGUAGE_NONE]['#ajax'] = array(
+    'callback' => 'custom_ajax_callback',
+    'wrapper' => 'cities-wrapper'
+  );
+
+
+  $form['field_sities']['#prefix'] = '<div id="cities-wrapper">';
+  $form['field_sities']['#suffix'] = '</div>';
+  $form['actions']['delete']['#access'] = FALSE;
+  $form['actions']['submit']['#prefix'] = '<div class="button"><a>';
+  $form['actions']['submit']['#suffix'] = '</a></div>';
+  $form['actions']['submit']['#submit'][] = 'heydesk_custom_function_form_proposal_node_form_submit';
+
+  $form['field_amenities_all']['amenities_container'] = array(
+    '#type' => 'item',
+    '#title' => $form['field_amenities_all'][LANGUAGE_NONE]['#title']
+  );
+
+  $form['field_amenities_all']['amenities_container']['amenities_list'] = array(
+    '#type' => 'container'
+  );
+
+  $form['field_amenities_all']['amenities_container']['amenities_add_more'] = array(
+    '#type' => 'item',
+    '#markup' => '<div class="add-edit-amenities-buttons"><span>+ ' . t('Add Amenities') . '</span><span>' . t('Edit Amenities') . '</span></div>'
+  );
+
+  $form['field_amenities_all'][LANGUAGE_NONE]['#field_suffix'] = '<div class="button"><a>' . t('Save') . '</a></div>';
+  $form['field_amenities_all'][LANGUAGE_NONE]['#title'] = '';
+
+  $form['field_photos']['photos_container'] = array(
+    '#type' => 'item',
+    '#title' => '* ' . $form['field_photos'][LANGUAGE_NONE]['#title']
+  );
+  $images_elements = '';
+  for ($i = 0; $i < 6; $i++) {
+    $images_elements .= '<div class="proposal-photo-item empty"></div>';
+  }
+
+  $form['field_photos']['photos_container']['photos_input'] = array(
+    '#type' => 'item',
+    '#prefix' => '<div id="field-photos-proposal-button"><div class="upload-icon"></div><div class="upload-text">' . t('Add a New Image') . '</div></div>',
+    '#markup' => '<div id="preview-photo-list">' . $images_elements . '</div>'
+  );
+}
+
+function heydesk_custom_function_form_proposal_node_form_submit($form, &$form_state) {
+  dpm($form_state);
+}
+
+function custom_ajax_callback(&$form, &$form_state) {
+  return $form['field_sities'];
+}
+
+/**
+ * Implements hook_menu().
+ */
+function heydesk_custom_function_menu() {
+  $items = array();
+
+  $items['taxonomy-city-autocomplete'] = array(
+    'title' => 'Autocomplete taxonomy city',
+    'page callback' => 'taxonomy_autocomplete_for_cities',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['front-page-taxonomy-city-autocomplete'] = array(
+    'title' => 'Front page autocomplete',
+    'page callback' => 'front_page_taxonomy_autocomplete_for_cities',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['comments/add/%/%ctools_js'] = array(
+    'title' => t('Comment'),
+    'page callback' => 'heydesk_comments_popup_callback',
+    'page arguments' => array(2, 3),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['admin/config/administration/heydesk/verification'] = array(
+    'title' => t('Heydesk ID Verification'),
+    'description' => t('Page Heydesk ID Verification'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('heydesk_validation_setting_form'),
+    'access callback' => TRUE,
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/config/administration/heydesk/financial-performance'] = array(
+    'title' => t('Heydesk Financial Performance'),
+    'description' => t('Page Heydesk ID Verification'),
+    'page callback' => 'heydesk_peymemt_admin_page_form',
+//    'page arguments' => array('heydesk_peymemt_admin_page_form'),
+    'access callback' => TRUE,
+    'access arguments' => array('heydesk administrator'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['id-validation/%/%/%'] = array(
+    'title' => 'Get content by AJAX',
+    'page callback' => 'heydesk_admin_validation_callback',
+    'page arguments' => array(1, 2, 3),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+  $items['delete/%/node/%ctools_js'] = array(
+    'title' => 'Change propoas status  by AJAX',
+    'page callback' => 'heydesk_proposal_change_status_callback',
+    'page arguments' => array(1, 3),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'delivery callback' => 'ajax_deliver',
+  );
+
+  return $items;
+}
+
+function heydesk_proposal_change_status_callback($node, $js = NULL) {
+
+  if (!$js) {
+    return drupal_get_form('heydesk_proposal_change_status_form');
+  }
+  ctools_include('ajax');
+  ctools_include('modal');
+  $form_state = array(
+    'ajax' => TRUE,
+    'node' => $node,
+  );
+  $output = ctools_modal_form_wrapper('heydesk_proposal_change_status_form', $form_state);
+  print ajax_render($output);
+  drupal_exit();
+
+
+}
+
+function heydesk_proposal_change_status_form($form, $form_state) {
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete'),
+    '#ajax' => array(
+      'callback' => 'heydesk_proposal_change_status_form_submit',
+    ),
+    '#prefix' => '<div class="button">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('submit'))
+  );
+  $form['cansel'] = array(
+    '#type' => 'button',
+    '#value' => t('Cancel'),
+    '#ajax' => array(
+      'callback' => 'operation_start_form_cancel',
+    ),
+    '#prefix' => '<div class="button cancel">',
+    '#suffix' => '</div>',
+    '#attributes' => array('class' => array('cancel'))
+
+  );
+  return $form;
+
+
+}
+
+function heydesk_proposal_change_status_form_submit($form, &$form_state) {
+  $nid = $form_state['node'];
+  $node = node_load($form_state['node']);
+  $node->status = 0;
+  $node = entity_save('node', $node);
+  ctools_include('modal');
+  ctools_include('ajax');
+  ctools_modal_add_js();
+  $commands = array();
+  $commands[] = ajax_command_remove('#proposal-' . $nid);
+  $commands[] = ctools_modal_command_dismiss();
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+
+
+}
+
+
+function heydesk_admin_validation_callback($uid, $status, $js = NULL) {
+  $user = user_load($uid);
+  $user->field_id_verification['und'][0]['value'] = $status;
+  $uaer = user_save($user);
+  if ($user) {
+    $commands = array();
+    $commands[] = ajax_command_remove('#edit-user-' . $uid);
+
+
+    return array('#type' => 'ajax', '#commands' => $commands);
+
+
+  }
+}
+
+function heydesk_validation_setting_form() {
+  $user_ids = db_select('field_data_field_id_verification', 'fd')
+    ->fields('fd', array('entity_id'))
+    ->condition('fd.field_id_verification_value', 1)
+    ->execute()
+    ->fetchCol();
+  $output = '';
+  if ($user_ids) {
+    foreach ($user_ids as $user) {
+      $user = user_load($user);
+      dpm($user);
+      $img_array = array(
+        'field_user_avatar',
+        'field_id_card_front_',
+        'field_id_card_back_',
+        'field_social_security_card',
+
+      );
+
+      //    ctools_add_js('collapse');
+      //    ctools_add_js('collapsible-div');
+      //    ctools_add_css('collapsible-div');
+      $form['user_' . $user->uid] = array(
+        '#type' => 'fieldset',
+        '#title' => $user->name,
+        //      '#collapsible' => TRUE,
+        //      '#collapsed' => TRUE,
+      );
+      //    $output .= '<div class="ctools-collapsible-container">';
+      //    $output .= '<div id="user_' . $user->uid . '" >';
+      //    $output .= '<h4 class="ctools-collapsible-handle">' .  . '</h4>';
+      //    $output .= '<div class="ctools-collapsible-content collapsed">';
+
+
+      foreach ($img_array as $key => $field) {
+        $renser = _user_image_output($field, $user);
+        $form['user_' . $user->uid]['image_' . $key] = array(
+          '#type' => 'markup',
+          '#markup' => drupal_render($renser),
+
+        );
+
+
+      }
+      $form['user_' . $user->uid]['link_validate'] = array(
+        '#markup' => l(t('Validate'), 'id-validation/' . $user->uid . '/2/nojs', array(
+          'attributes' => array(
+            'class' => array(
+              'use-ajax',
+              'button'
+
+            )
+          )
+        )),
+        '#type' => 'markup',
+        '#prefix' => '<div>'
+      );
+      $form['user_' . $user->uid]['link_novalidate'] = array(
+        '#markup' => l(t('No Validate'), 'id-validation/' . $user->uid . '/0/nojs', array(
+          'attributes' => array(
+            'class' => array(
+              'use-ajax',
+              'button'
+
+            )
+          )
+        )),
+        '#type' => 'markup',
+        '#suffix' => '</div>'
+      );
+
+      //    $output .= '</div>';
+      //    $output .= '</div>';
+      //    $output .= '</div>';
+
+
+    }
+  }
+  else {
+    $form['empty'] = array(
+      '#type' => 'markup',
+      '#markup' => t('No User for validation.'),
+
+    );
+
+
+  }
+  return $form;
+
+
+}
+
+function _user_image_output($field_name, $user) {
+
+  $image = field_get_items('user', $user, $field_name);
+  $output = field_view_value('user', $user, $field_name, $image[0], array(
+    'type' => 'image',
+    'settings' => array(
+      'label' => 'inline',
+      'image_style' => 'sity_355x390',
+      'image_link' => 'none',
+    ),
+  ));
+  return $output;
+}
+
+function taxonomy_autocomplete_for_cities($field_name = '', $selected = '', $tags_typed = '') {
+  if (!($field = field_info_field($field_name)) || $field['type'] !== 'taxonomy_term_reference') {
+    print t('Taxonomy field @field_name not found.', array('@field_name' => $field_name));
+    exit;
+  }
+  $tags_typed = drupal_explode_tags($tags_typed);
+  $tag_last = drupal_strtolower(array_pop($tags_typed));
+
+  $term_matches = array();
+  if ($tag_last != '') {
+    $vids = array();
+    $vocabularies = taxonomy_vocabulary_get_names();
+    foreach ($field['settings']['allowed_values'] as $tree) {
+      $vids[] = $vocabularies[$tree['vocabulary']]->vid;
+    }
+    $query = db_select('taxonomy_term_data', 't');
+    $query->addTag('translatable');
+    $query->addTag('taxonomy_term_access');
+    if (!empty($tags_typed)) {
+      $query->condition('t.name', $tags_typed, 'NOT IN');
+    }
+    $query->innerJoin('field_data_field_counry_reference', 'fcr', 'fcr.entity_id = t.tid');
+    $query->fields('t', array('tid', 'name'))
+      ->condition('t.vid', $vids)
+      ->condition('t.name', '%' . db_like($tag_last) . '%', 'LIKE');
+    if ($selected) {
+      $query->condition('fcr.field_counry_reference_tid', $selected);
+    }
+    $query->range(0, 10);
+    $tags_return = $query->execute()->fetchAllKeyed();
+    $prefix = count($tags_typed) ? drupal_implode_tags($tags_typed) . ', ' : '';
+
+    foreach ($tags_return as $tid => $name) {
+      $n = $name;
+      if (strpos($name, ',') !== FALSE || strpos($name, '"') !== FALSE) {
+        $n = '"' . str_replace('"', '""', $name) . '"';
+      }
+      $term_matches[$prefix . $n] = check_plain($name);
+    }
+  }
+  drupal_json_output($term_matches);
+}
+
+function front_page_taxonomy_autocomplete_for_cities() {
+  global $base_url;
+  $user_input = isset($_GET['term']) ? $_GET['term'] : '';
+  $query = db_select('taxonomy_term_data', 't');
+  $query->fields('t', array('tid', 'name'));
+  $query->condition('t.vid', 2);
+  $query->condition('t.name', '%' . db_like($user_input) . '%', 'LIKE');
+  $query->range(0, 10);
+  $tags_return = $query->execute()->fetchAll();
+  $result = array();
+  foreach ($tags_return as $key => $tag) {
+    $taxonomy_link = $base_url . '/serch-now?field_sities_tid=' . $tag->name;
+    $taxonomy_city = taxonomy_term_load($tag->tid);
+    $city_name = $taxonomy_city->name;
+    $taxonomy_country_id = (isset($taxonomy_city->field_counry_reference[LANGUAGE_NONE][0]['tid']) ? $taxonomy_city->field_counry_reference[LANGUAGE_NONE][0]['tid'] : '');
+    $country_name = '';
+    $taxonomy_country = taxonomy_term_load($taxonomy_country_id);
+    if ($taxonomy_country) {
+      $country_name = isset($taxonomy_country->name) ? $taxonomy_country->name : '';
+    }
+    $result[$key]['link'] = $taxonomy_link;
+    $result[$key]['city_name'] = $city_name;
+    $result[$key]['coun_name'] = $country_name;
+  }
+  // print_r($result);
+  drupal_json_output($result);
+}
+
+function _heydesk_proposal_custom_view($nid, $view = 'default') {
+  $node = node_load($nid);
+  $options = array(
+    'label' => 'hidden',
+    // 'inline', 'above' and 'hidden', defaults to 'above'
+    'type' => 'full',
+  );
+  $options_description = array(
+    'label' => 'hidden',
+    'type' => 'text_summary_or_trimmed',
+    'settings' => array('trim_length' => 50),
+  );
+
+  $options_term = array(
+    'label' => 'hidden',
+    'type' => 'taxonomy_term_reference_link',
+  );
+  $options_img = array(
+    'type' => 'image',
+    'label' => 'hidden',
+    'settings' => array(
+      'image_style' => 'user_150x150',
+      'image_link' => 'none', // content, file
+    )
+  );
+
+  $img = field_get_items('node', $node, 'field_photos');
+  $img = isset($img[1]) ? field_view_value('node', $node, 'field_photos', $img[0], $options_img) : field_view_field('node', $node, 'field_photos', $options_img);
+  $title = field_get_items('node', $node, 'title');
+  $title = field_view_value('node', $node, 'title', $title[0], $options);
+  $description = field_get_items('node', $node, 'field_location_description');
+  $description = field_view_value('node', $node, 'field_location_description', $description[0], $options_description);
+  $address = field_get_items('node', $node, 'field_address');
+  $address = field_view_value('node', $node, 'field_address', $address[0], $options);
+
+  $city = field_view_field('node', $node, 'field_sities', $options_term);
+  $country = field_view_field('node', $node, 'field_sities', $options_term);
+  $address_string = '<i class="fa fa-map-marker" aria-hidden="true"></i> ' . render($address) . ', ' . render($city) . ', ' . render($country);
+
+
+  switch ($view) {
+    case 'boost':
+      $output = '<div class="proposal_view">';
+      $output .= '<div class="proposal_image">';
+      $output .= render($img);
+      $output .= '</div>';
+      $output .= '<div class="proposal_info">';
+      $output .= render($title);
+      $output .= render($description);
+      $output .= $address_string;
+      $output .= '</div>';
+      $output .= '</div>';
+      return $output;
+
+      break;
+  }
+
+
+}
+
+function _neydesk_field_not_empty($entity, $field_name, $default_value = NULL) {
+  dpm($field_name);
+  dpm($entity->$field_name[LANGUAGE_NONE][0]['value']);
+
+  return isset($entity->$field_name[LANGUAGE_NONE][0]['value']) ? $entity->$field_name[LANGUAGE_NONE][0]['value'] : $default_value;
+
+}
+
+function _heydesk_user_full_name($user) {
+  return _neydesk_field_not_empty($user, 'field_first_name', '') . ' ' . _neydesk_field_not_empty($user, 'field_surname', '');
+}
+
+function _term_name($tid) {
+  $term = isset($tid) ? taxonomy_term_load($tid) : FALSE;
+  $term_name = ($term != FALSE) ? $term->name : '';
+  return $term_name;
+}
+
+function _term_tid_not_empty($entity, $field_name, $default_value = NULL) {
+  return isset($entity->$field_name[LANGUAGE_NONE][0]['tid']) ? $entity->$field_name[LANGUAGE_NONE][0]['tid'] : $default_value;
+
+
+}
+
+function _heydesk_value_not_empty($value) {
+
+  return isset($value) ? $value : '';
+}
+
+function heydesk_secuirity() {
+  global $user;
+  if ((arg(0) == 'user') && (arg(1) != $user->uid) && (arg(2) != FALSE)) {
+    drupal_goto('user/' . $user->uid . '/' . arg(2));
+  }
+
+}
+
+
+function heydesk_comments_popup_callback($nid, $nojs = NULL) {
+
+  global $comment_popup;
+  $comment_popup = 1;
+  heydesk_ctools_popup_style();
+
+  $comment = (object) array('nid' => $nid);
+  $form_state = array(
+    'title' => 'Write a Reivew',
+    'ajax' => TRUE,
+    're_render' => FALSE,
+    'no_redirect' => TRUE,
+  );
+  $form_state['build_info']['args'] = array($comment);
+  $commands = array();
+
+
+  $output = ctools_modal_form_wrapper('comment_node_proposal_form', $form_state);
+
+  if (!empty($form_state['executed']) || !empty($form_state['ajax_commands'])) {
+
+
+    $commands[] = ctools_modal_command_dismiss(t('Your comment has been saved.'));
+    $commands[] = ctools_ajax_command_reload();
+  }
+
+  print ajax_render($output);
+  drupal_exit();
+  //  return ajax_deliver(array('#type' => 'ajax', '#commands' => $commands));
+  //  return array('#type' => 'ajax', '#commands' => $commands);
+
+
+}
+
+function heydesk_form_comment_form_alter(&$form, &$form_state) {
+  //    dpm($form);
+
+
+  global $comment_popup;
+
+  if ($comment_popup == 1) {
+    $unique_key = 'form-wrapper-' . $form['#build_id'];
+
+
+    $comment = $form_state['comment'];
+
+    // If not replying to a comment, use our dedicated page callback for new
+    // comments on nodes.
+    if (empty($comment->cid) && empty($comment->pid)) {
+      $form['comment_body']['und'][0]['value']['#title'] = '<span>' . t('Review from ') . '</span>' . $form['#node']->title;
+      // Change the action to call our function.
+      $form['#action'] = url('comments/add/' . $form['#node']->nid . '/noja');
+
+      $form['author']['#access'] = FALSE;
+      $form['actions']['submit']['#ajax'] = array(
+        'wrapper' => $unique_key,
+        'callback' => 'form_modal_write_comment_submit',
+      );
+    }
+
+    $comment_popup = 0;
+  }
+  //
+  //
+  //  /* Remove the "your name" elements for authenticated users */
+  //  global $user;
+  //  $form['submit']['#ajax']['callback'] = 'form_modal_write_comment_submit';
+  ////  $form['author']['#access'] = ($user->uid == 0);
+  //  $form['actions']['preview']['#access'] = FALSE;
+  //
+  ////  $form['#action'] = '/comments/add/' . $form_state['nid'] . '/nojs';
+  //  //  $form['#submit'][] = 'form_modal_write_comment_submit';
+}
+
+function form_modal_write_comment_submit($form, &$form_state) {
+
+  global $user;
+  $body = check_plain($form_state['values']['comment_body']);
+  $title = t('Comment');
+
+  // Add a comment, and configure the first easy fields.
+  $comment = (object) array(
+    'nid' => $form_state['nid'],
+    'cid' => NULL,
+    'pid' => NULL,
+    'uid' => $user->uid,
+    'mail' => '',
+    'is_anonymous' => 0,
+    'homepage' => '',
+    'status' => COMMENT_PUBLISHED,
+    'language' => LANGUAGE_NONE,
+  );
+  $comment->subject = $title;
+
+  if (!empty($body)) {
+    $comment->comment_body[LANGUAGE_NONE][0]['value'] = check_plain($body);
+    $comment->comment_body[LANGUAGE_NONE][0]['format'] = 'plain_text';
+  }
+  comment_submit($comment);
+  //  comment_save($comment);
+  ctools_include('ajax');
+  ctools_include('modal');
+
+  $commands[] = ctools_ajax_command_redirect('user/' . $user->uid . '/booking-overview');
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+function heydesk_system_massage_callback($message, $nojs = NULL) {
+  $popup_content = t('Hello World');
+  if (!$nojs) {
+    drupal_set_message($message);
+  }
+  ctools_include('modal');
+  ctools_include('ajax');
+  // ������������ ���������� ����.
+  $commands = array();
+  $commands[] = ctools_modal_command_display(t('System Message'), $message);
+  $commands[] = example_ctools_modal_command_dismiss(3000);
+
+  return array('#type' => 'ajax', '#commands' => $commands);
+
+
+}
+
+function example_ctools_modal_command_dismiss($delay = 0) {
+  return array(
+    'command' => 'example_modal_dismiss',
+    'delay' => $delay,
+  );
+}
+
+function _user_having_proposal_set($proposal_id) {
+
+  $node = node_load($proposal_id);
+
+  return $node->uid;
+//  return $node;
+}
+
+

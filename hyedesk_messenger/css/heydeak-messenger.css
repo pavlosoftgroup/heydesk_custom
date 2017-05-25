@@ -1,0 +1,243 @@
+.my_message {
+	/*background: #F78E44;*/
+	margin-left: 50px;
+}
+
+.for-me-message {
+	margin-right: 50px;
+}
+
+.all_message {
+	border: 1px solid #333333;
+	border-radius: 8px;
+	padding: 20px;
+	width: 75%;
+}
+
+.page-user-messages-message-list .mesenger_block {
+	/*border: 1px solid #333333;*/
+	border-radius: 8px;
+	padding-top: 10px;
+	padding-bottom: 0px;
+}
+
+.page-user-messages-message-list .all_message {
+	display: inline-block;
+	margin-bottom: 20px;
+	width: 59%;
+}
+
+div.ctools-modal-content .modal-content .modal-throbber-wrapper img {
+	margin: 80px auto !important;
+}
+
+#hyedesk-messenger-send-form .resizable-textarea {
+	width: auto;
+	margin-left: 0 !important;
+	margin-right: 0 !important;
+}
+
+.avater a img {
+	border-radius: 50%;
+}
+
+.new_one {
+	position: absolute;
+	top: -22px;
+	left: 45%;
+	width: 100px;
+	height: 30px;
+	border-radius: 6px;
+	background: #EC2360;
+	text-align: center;
+	line-height: 2;
+}
+
+.top.clearfix span {
+	font-size: 18px;
+	font-weight: bold;
+	color: #FFFFFF;
+	padding: 4px 0;
+}
+
+.top.clearfix {
+	padding-bottom: 4px;
+	border-bottom: 1px solid #000000;
+	border-top-left-radius: 8px;
+	border-top-right-radius: 8px;
+	background-color: #333333;
+	margin-bottom: 10px;
+	padding: 2px 20px;
+}
+
+.mesenger_block h3 {
+	font-weight: bold !important;
+	padding-bottom: 3px;
+	border-bottom: 1px solid #000000;
+	margin: 7px 20px;
+}
+
+.mesenger_block .text {
+	margin: 10px 20px;
+}
+
+.field-name-field-user-avatar img {
+	border-radius: 50%;
+}
+
+.page-user-messages-message-list .sendler {
+	float: left;
+}
+
+.page-user-messages-message-list .user {
+	float: right;
+}
+
+/*Send form*/
+#hyedesk-messenger-send-form label {
+	font-size: 18px;
+}
+
+#hyedesk-messenger-send-form input,
+#hyedesk-messenger-send-form textarea {
+	border-radius: 6px;
+	border: 1px solid #333333;
+	padding: 0 10px 0 10px;
+	display: block;
+}
+
+#hyedesk-messenger-send-form input {
+	height: 40px;
+}
+
+#hyedesk-messenger-send-form textarea {
+	resize: none;
+}
+
+/*block for write text message*/
+#left_message{
+	width: 80%;
+}
+
+ #right_message{
+	 margin-left: 50px;
+ }
+
+ #right_message img{
+	 border-radius: 6px;
+	 width: 200px;
+	 height: 170px;
+ }
+
+#center_message{
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+}
+
+#message-header a{
+	color: #333;
+	margin-right: 40px;
+}
+
+#message-header .all_massage span{
+	display: inline-block;
+	margin-right: 10px;
+	width: 20px;
+	height: 10px;
+	background-image: url('../../../../themes/heydesk/images/left_long_arrow.png');
+	background-repeat: no-repeat;
+	background-size: 20px 10px;
+}
+
+#message-header h3{
+	font-size: 30px;
+	font-weight: bold;
+	display: inline-block;
+}
+
+#message_form{
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	border-radius: 8px;
+	padding: 20px 20px 15px 20px;
+	background: -webkit-linear-gradient(left, rgba(255, 12, 93, 1) 0%, rgba(255, 137, 63, 1) 100%);
+    background: linear-gradient(to right, rgba(255, 12, 93, 1) 0%, rgba(255, 137, 63, 1) 100%);
+}
+
+#message_form img{
+	border-radius: 35px;
+	margin-right: 15px;
+}
+
+#message_form #hyedesk-messenger-send-message-form{
+	display: inline-block;
+	width: 95%;
+}
+
+#message_form #hyedesk-messenger-send-message-form #edit-message{
+	border-radius: 6px;
+	border: none;
+	padding: 12px;
+	outline: none;
+	width: 100%;
+	height: 90px;
+	resize: none;
+}
+
+#message_form #hyedesk-messenger-send-message-form .form-item-message{
+	margin-top: 0px;
+}
+
+#message_form #hyedesk-messenger-send-message-form .button{
+	background: #333;
+	width: 135px;
+	height: 35px;
+	margin-top: 15px;
+}
+
+#message_form #hyedesk-messenger-send-message-form .button input{
+	font-size: 17px;
+	width: 100%;
+	height: 100%;
+	padding: 0px;
+}
+
+#center_message .sticky-table thead{
+
+}
+
+#center_message .sticky-table tr{
+	border-bottom: 1px solid #333;
+}
+
+#center_message .sticky-table tr td{
+	min-height: 80px;
+}
+
+#message_form #hyedesk-messenger-send-message-form .button input:hover{
+	border: 2px solid #333;
+    background: #fff;
+    color: #333;
+}
+
+/* page proposal node */
+
+.short_message .info{
+   display: inline-block;
+   height: auto;
+   width: auto;
+   margin-bottom: 0px;
+   margin-left: 20px;
+}
+
+.short_message img{
+   border-radius: 35px;
+}
+
+.short_message .button>input{
+   border: none !important;
+   width: 100% !important;
+   height: 100% !important;
+}

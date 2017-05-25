@@ -1,0 +1,9 @@
+name = Heydesk Users Messenger
+description = Realisation Users Messenger
+package = Heydesk Custom Modules
+core = 7.x
+files[] = hyedesk_messenger.module
+files[] = hyedesk_messenger.install
+
+dependencies[] = heydesk_custom_function
+dependencies[] = entity

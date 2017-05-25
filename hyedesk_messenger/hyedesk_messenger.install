@@ -1,0 +1,25 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function hyedesk_messenger_schema()
+{
+  $schema['hyedesk_messenger'] = array(
+    'description' => t('Table for messenger'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'title'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE,  'description' => t('Title')),
+      'message'        => array('type' => 'text', 'size' => 'normal',  'description' => t('Message')),
+      'uid'       => array('type' => 'int', 'length' => 8, 'not null' => TRUE,  'description' => t('User ID of acceptor')),
+      'sid' => array('type' => 'int', 'length' => 8, 'not null' => TRUE, 'description' => t('User ID of sender')),
+      'date' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'description' => t('Message date')),
+      'status' => array('type' => 'char', 'length' => 1, 'not null' => TRUE, 'default' => '1', 'description' => t('Message status')),
+    ),
+    'indexes' => array(
+      'title' => array('title')
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

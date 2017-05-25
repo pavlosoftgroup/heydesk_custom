@@ -1,0 +1,9 @@
+name = Heydesk Payment
+description = Realisation payment system in site
+package = Heydesk Custom Modules
+core = 7.x
+files[] = heydesk_peyment.module
+files[] = heydesk_peyment.install
+
+dependencies[] = heydesk_custom_function
+dependencies[] = entity

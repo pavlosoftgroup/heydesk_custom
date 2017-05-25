@@ -1,0 +1,25 @@
+<?php
+
+/**
+ * Implement hook_schema
+ */
+function heydesk_calendar_schema()
+{
+  $schema['heydesk_calendar'] = array(
+    'description' => t('Table for calendar'),
+    'fields'      => array(
+      'id'         => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE, 'unsigned' => TRUE, 'description' => t('Primary key')),
+      'date_from'       => array('type' => 'varchar', 'length' => 24, 'not null' => TRUE,  'description' => t('Date from')),
+      'date_to'       => array('type' => 'varchar', 'length' => 24, 'not null' => TRUE,  'description' => t('Date to')),
+      'pid' => array('type' => 'int', 'length' => 8, 'not null' => TRUE, 'description' => t('ID proposal')),
+      'date' => array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' => t('Listing date')),
+      'status' => array('type' => 'char', 'length' => 1, 'not null' => TRUE, 'default' => '0', 'description' => t('Message status')),
+    ),
+    'indexes' => array(
+      'date_from' => array('date_from'),
+      'date_to' => array('date_to'),
+    ),
+    'primary key' => array('id')
+  );
+  return $schema;
+}

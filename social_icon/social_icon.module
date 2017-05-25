@@ -1,0 +1,360 @@
+<?php
+
+define('WEIGHT', '50');
+define('HEIGHT', '50');
+define('ARG', '4');
+
+
+/*function social_icon_page_build(&$page)
+{
+    $path = drupal_get_path('module', 'social_icon');
+    $attached = &$page['page_bottom']['social_icon']['#attached'];
+    $options = array('every_page' => TRUE);
+    $attached['js'][$path . '/social_icon.js'] = $options;
+    $attached['css'][$path . '/social_icon.js'] = $options;
+   /* $build['#attached'] = array(
+        'js' => array(drupal_get_path('module', 'social_icon') . '/social_icon.js'),
+        'css' => array(drupal_get_path('module', 'social_icon') . '/social_icon.css'),
+    );*//*
+}*/
+
+module_load_include('inc', 'social_icon', 'includes/social_icon.block');
+//drupal_add_css(drupal_get_path('module', 'social_icon') . '/social_icon.css');
+//drupal_add_js(drupal_get_path('module', 'social_icon') . '/social_icon.js');
+
+function social_icon_menu() {
+
+  $items['admin/config/administration/social_icon'] = array(
+    'title' => t('Social icon'),
+    'description' => t('Setting social icon'),
+    'page callback' => 'social_icon_list',
+    'access callback' => TRUE,
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/administration/social_icon/list'] = array(
+    'title' => t('Social icon List'),
+    'description' => t('Social icon List'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 0,
+  );
+  $items['admin/config/administration/social_icon/form'] = array(
+    'title' => t('Add Social Icon'),
+    'description' => t('Setting social icon'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('social_icon_form'),
+    'access callback' => TRUE,
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 1,
+  );
+  $items['admin/config/administration/social_icon/%social_icon/edit'] = array(
+    'title' => t('Edit Social Icons'),
+    'description' => t('Setting social icons'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('social_icon_form', 4),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/config/administration/social_icon/%social_icon/delete'] = array(
+    'title' => t('Delete Social Icons'),
+    'description' => t('Setting social icons'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('social_icon_delete_form', 4),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+//register
+function social_icon_entity_info() {
+  return array(
+    'social_icon' => array(
+      'label' => t('Social icon'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'social_icon',
+      'entity keys' => array(
+        'id' => 'id'
+      ),
+      'admin ui' => array(
+        'path' => 'admin/config/administration/social_icon'
+      ),
+      'access callback' => 'social_icon_access',
+      'module' => 'social_icon',
+    ),
+  );
+}
+
+function social_icon_access($op, $entity, $account = NULL, $entity_type = 'social_icon') {
+  return user_access('administer site configuration');
+}
+
+
+function _image_array($fid) {
+  if (!empty($fid)) {
+    $social_icon = array(
+      'path' => file_create_url(file_load($fid)->uri),
+      'width' => '50px',
+      'height' => '50px',
+      'attributes' => array('class' => 'social-img', 'id' => 'social-img'),
+    );
+    return theme_image($social_icon);
+  }
+  else {
+    return NULL;
+  }
+}
+
+function social_icon_load($id) {
+  $result = entity_load('social_icon', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+//load entity from database by id
+
+/*function social_icon_load($id) {
+    $result = db_select('social_icon', 'si')
+        ->fields('si', array('id','title', 'url', 'icon', 'hover_icon'))
+        ->where('id = '. db_escape_field($id))
+        ->execute()
+        ->fetch();
+    return $result;
+}*/
+/*function social_icon_list() {
+    $social_icons = db_select('social_icon', 'si')->fields('si', array('id','title', 'url', 'icon', 'hover_icon'))->orderBy('si.id')->execute();
+    // dpm($social_icons);
+    $header = array(t('Title'), t('Link'), t('Icon'), t('Hover Icon'), t('Actions'));
+
+    $rows = array();
+
+    foreach ($social_icons as $icon) {
+        $actions = array(
+            l(t('edit'), 'admin/config/administration/social_icon/form/' . $icon->id . '/edit'),
+            l(t('delete'), 'admin/config/administration/social_icon/form/' . $icon->id . '/delete', array('query' => array('token' => drupal_get_token('social_icon-' . $icon->id)))),
+        );
+ dpm($icon);
+        $rows[] = array($icon->title, $icon->url, _image_array($icon->icon), _image_array($icon->hover_icon),  implode(' | ', $actions));
+    }
+
+    $output = theme('table', array('header' => $header, 'rows' => $rows));
+
+    return $output;
+}
+*/
+
+function social_icon_list() {
+  $header = array(
+    t('Title'),
+    t('Url'),
+    t('Icon'),
+    t('Hover icon'),
+    t('Actions')
+  );
+  $rows = array();
+  $entity = entity_load('social_icon');
+
+  foreach ($entity as $id) {
+    $actions = array(
+      l(t('edit'), 'admin/config/administration/social_icon/' . $id->id . '/edit'),
+      l(t('delete'), 'admin/config/administration/social_icon/' . $id->id . '/delete', array('query' => array('token' => drupal_get_token('social_icon-' . $id->id)))),
+    );
+    $rows[] = array(
+      $id->title,
+      $id->url,
+      _image_array($id->icon),
+      _image_array($id->hover_icon),
+      implode(' | ', $actions)
+    );
+  }
+
+  $output = theme('table', array('header' => $header, 'rows' => $rows));
+
+  return $output;
+}
+
+//dpm();
+
+
+function social_icon_form($form, &$form_state, $social_icon = NULL, $op = 'edit') {
+  //$arg = is_numeric(arg(5)) ? intval(arg(5)) : NULL;
+  // $social_icon = !empty($arg) ? social_icon_load($arg) : '';
+
+
+  $form['setting'] = array(
+    '#title' => t('Add icon'),
+    '#type' => 'fieldset',
+    '#required' => TRUE,
+  );
+
+  $form['setting']['id'] = array(
+    '#type' => 'value',
+    '#value' => isset($social_icon->id) ? $social_icon->id : FALSE,
+  );
+
+  $form['setting']['title'] = array(
+    '#title' => t('Title'),
+    '#type' => 'textfield',
+    '#maxlength' => 124,
+    '#size' => 60,
+    '#required' => TRUE,
+    '#default_value' => isset($social_icon->title) ? $social_icon->title : '',
+    '#description' => t('Title must consists of letters')
+  );
+  $form['setting']['url'] = array(
+    '#title' => t('Link'),
+    '#type' => 'textfield',
+    '#maxlength' => 124,
+    '#required' => TRUE,
+    '#default_value' => isset($social_icon->url) ? $social_icon->url : '',
+    '#description' => t('Input link in format "http://" or "https://".')
+  );
+  $form['setting']['icon'] = array(
+    '#title' => t('Upload icon'),
+    '#type' => 'managed_file',
+    '#default_value' => isset($social_icon->icon) ? $social_icon->icon : '',
+    //  '#required' => TRUE,
+    '#description' => t('Only JPEG, PNG and GIF images are allowed.'),
+    '#upload_location' => 'public://upload/',
+    '#upload_validators' => array(
+      'file_validate_is_image' => array(),
+      'file_validate_extensions' => array('png gif jpg jpeg'),
+      'file_validate_size' => array(1 * 1024 * 1024),
+    ),
+
+  );
+  $form['setting']['hover_icon'] = array(
+    '#title' => t('Upload hover icon'),
+    '#type' => 'managed_file',
+    '#default_value' => isset($social_icon->hover_icon) ? $social_icon->hover_icon : '',
+    //  '#required' => TRUE,
+    '#description' => t('Only JPEG, PNG and GIF images are allowed.'),
+    '#upload_location' => 'public://upload/',
+    '#upload_validators' => array(
+      'file_validate_is_image' => array(),
+      'file_validate_extensions' => array('png gif jpg jpeg'),
+      'file_validate_size' => array(1 * 1024 * 1024),
+    ),
+
+  );
+
+  $form['setting']['back'] = array(
+    '#type' => 'markup',
+    '#markup' => l(t('  Back to Social icon list  '), 'admin/config/administration/social_icon/list')
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit')
+  );
+
+  return $form;
+}
+
+
+//validate entered data
+function social_icon_form_validate($form_id, $form_state) {
+
+  if (!preg_match('/^(http|https):\/\//', $form_state['values']['url'])) {
+    form_set_error('url', t('"Url" do not begin "http://" or "https://"'));
+  }
+
+
+  /* $errors = array();
+
+   $info = image_get_info($file->uri);
+   if (!$info || empty($info['extension'])) {
+       $errors[] = t('Only JPEG, PNG and GIF images are allowed.');
+   }*/
+}
+
+function social_icon_save($values) {
+
+
+}
+
+
+function social_icon_create($values) {
+
+
+}
+
+//insert entity to database
+function social_icon_form_submit($form, $form_state) {
+  $icons = array(
+    $form_state['values']['icon'],
+    $form_state['values']['hover_icon'],
+  );
+  foreach ($icons as $fid) {
+    $file = file_load($fid);
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+  }
+
+  if ($form_state['values']['id']) {
+    $social_icons = social_icon_load($form_state['values']['id']);
+    $social_icons->title = $form_state['values']['title'];
+    $social_icons->url = $form_state['values']['url'];
+    $social_icons->icon = $form_state['values']['icon'];
+    $social_icons->hover_icon = $form_state['values']['hover_icon'];
+    $social_icons = entity_save('social_icon', $social_icons);
+  }
+  else {
+    $values = array(
+      'title' => $form_state['values']['title'],
+      'url' => $form_state['values']['url'],
+      'icon' => $form_state['values']['icon'],
+      'hover_icon' => $form_state['values']['hover_icon'],
+    );
+    $social_icons = entity_create('social_icon', $values);
+    $social_icons = entity_save('social_icon', $social_icons);
+
+  }
+  if ($social_icons) {
+    drupal_set_message(t('Form submit'));
+  }
+  $form_state['redirect'] = 'admin/config/administration/social_icon/list';
+}
+
+
+//delete entity
+function social_icon_delete_form($form, &$form_state, $social_icon) {
+  dpm($social_icon);
+  $form['delete'] = array(
+    '#title' => t('Delete icon'),
+    '#type' => 'fieldset',
+  );
+  $form['id'] = array(
+    '#type' => 'value',
+    '#value' => arg(4)
+  );
+  $form['delete']['back'] = array(
+    '#type' => 'markup',
+    '#markup' => l(t('Back '), 'admin/config/administration/social_icon/list')
+  );
+  $form['delete']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete'),
+    '#submit' => array('social_icon_delete_form_submit'),
+    // '#validate' => TRUE,
+
+  );
+  return $form;
+}
+
+
+function social_icon_delete_form_submit($form, &$form_state) {
+  $delete = entity_delete('social_icon', $form_state['values']['id']);
+  if ($delete) {
+    drupal_set_message(t('Icon deleted'));
+  }
+  $form_state['redirect'] = 'admin/config/administration/social_icon/list';
+
+
+}
+
+function social_icon_init() {
+  drupal_add_css(drupal_get_path('module', 'social_icon') . '/social_icon.css');
+  drupal_add_js(drupal_get_path('module', 'social_icon') . '/social_icon.js');
+}
